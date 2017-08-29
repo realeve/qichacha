@@ -25,15 +25,7 @@ async function query(sql, data, callback) {
     }
     return new Promise((resolve, reject) => {
         pool.getConnection((err, conn) => {
-            if (sql.includes('insert into jd_comment(')) {
-                conn.query('set names utf8mb4', (err, result) => {
-                    if (err) {
-                        conn.release();
-                        resolve(result);
-                    }
-                });
-            }
-
+            
             // 此处应该会由conn.query自动判断data的属性从而决定parse还是callback
             conn.query(sql, data, (err, result) => {
                 errorHandle(err, sql);

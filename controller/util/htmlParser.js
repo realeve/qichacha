@@ -1,68 +1,91 @@
 let util = require('./common')
 let cheerio = require('cheerio')
 
-let youzan = {
-    goodsList(html) {
-        let rec_date = util.getNow()
-        let options = {
-            html,
-            parentNode: '.js-goods-card.goods-card.card',
-            children: [{
-                node: '.js-goods-buy.buy-response',
-                name: 'data',
+let province = html => {
+
+    let options = {
+        html,
+        parentNode: '.filter-tag dd',
+        children: [
+            {
+                node: 'a',
+                name: 'href',
                 formatter(el) {
-                    return {
-                        title: el.data('title'),
-                        alias: el.data('alias'),
-                        price: el.data('price'),
-                        isVirtual: el.data('isvirtual'),
-                        goodId: el.data('id')
-                    }
+                    return el.attr('href');
                 }
             }, {
-                node: '.goods-photo.js-goods-lazy',
-                name: 'imgSrc',
+                node: 'a',
+                name: 'province',
                 formatter(el) {
-                    return el.data('src')
+                    return el
+                        .text()
+                        .split(' - ')[1]
                 }
-            }, {
-                node: '.goods-price-taobao',
-                name: 'priceTaobao'
-            }],
-            formatter(obj) {
-                obj.data.imgSrc = obj.imgSrc
-                obj.data.priceTaobao = obj.priceTaobao
-                obj.data.rec_date = rec_date
-                return obj.data
             }
-        }
-        return util.parseHTML(options)
-    },
-    goodsDetail(html) {
-        let rec_date = util.getNow()
-        let options = {
-            html,
-            parentNode: '.stock-detail dd',
-            mode: 1,
-            children: [{
-                name: 'freight',
-                formatter(el) {
-                    return el.text().replace(/\n/, '').trim()
-                }
-            }, {
-                name: 'stock'
-            }, {
-                name: 'sales'
-            }],
-            formatter(obj) {
-                obj.rec_date = rec_date
-                return obj
-            }
-        }
-        return util.parseHTML(options)
+        ]
     }
+    return util.parseHTML(options)
+};
+
+let company = html => {
+
+    let options = {
+        html,
+        parentNode: 'section#searchlist',
+        children: [
+            {
+                node: '.name',
+                name: 'company_name'
+            }, {
+                node: '.label',
+                name: 'company_status'
+            }, {
+                node: '.list-group-item',
+                name: 'href',
+                formatter(el) {
+                    return el.attr('href');
+                }
+            }, {
+                node: '.i-local',
+                name: 'address',
+                formatter(el) {
+                    return el
+                        .parent()
+                        .text();
+                }
+            }, {
+                node: '.i-user3',
+                name: 'attr',
+                formatter(el) {
+                    let texts = el.parent().text().replace(/\n/g,'').split(' ');
+                    let data = [];
+                    texts.forEach(item=>{
+                        if(item!=''){
+                            data.push(item);
+                        }
+                    });
+                    return data;
+                }
+            }
+        ]
+    }
+    return util.parseHTML(options)
+};
+
+companyPage = html=>{    
+    let options = {
+        html,
+        parentNode: '.pagination',
+        children: [{
+            node: '.end',
+            name: 'page'
+        }]
+    }
+    return util.parseHTML(options)
 }
 
 module.exports = {
-    youzan
+    province,
+    company,
+    companyPage
 }

@@ -1,30 +1,35 @@
 let getNow = require('./common').getNow
-    // 本模块用于一次性插入大量数据时对原始数据的处理
+// 本模块用于一次性插入大量数据时对原始数据的处理 销售记录详情数据
+function provinceList(provinces) {
+    let sql = 'insert into provinceIndex(province,href,pagenum) values '
 
-// 销售记录详情数据
-function handleSaleDetailData(saleInfo) {
-    let url = sql.insert.yz_trade_record
-    let lastTimeStr = ''
-    let sqlValues = saleInfo.data.map(item => {
-
-        // 处理原始销售记录中未输出年份的问题
-        let time = item.update_time
-        time = ((time.substr(0, 2) > '03') ? '2016-' : '2017-') + time
-
-        // 默认大于3月为2016年，否则为2017年，数据列表中有2-29这样的非法日期，事实上应为2016或2015年的销售记录
-        if (lastTimeStr !== '') {
-            if (time > lastTimeStr) {
-                time = lastTimeStr
-            }
-        }
-        lastTimeStr = time
-
-        return `('${saleInfo.alias}',${saleInfo.goodId},'${item.nickname}',${item.item_num},${item.item_price},'${time}','${saleInfo.shopName}')`
+    let sqlValues = provinces.map(item => {
+        return `('${item.province}','${item.href}',0)`;
     })
-    url = url.replace('?', sqlValues.join(','))
-    return url
+
+    return sql + sqlValues.join(',');
+}
+
+function companyList(companys, provinceId) {
+    let sql = 'insert into companyIndex(province_id,company_name,href,company_status,leader,reg_date,reg_captial,company_type,address,item_flag) values ';
+    let sqlValues = companys.map(item => {
+        let companyType = typeof item.attr[3] == 'undefined'
+            ? ''
+            : item.attr[3];
+        let reg_captial = typeof item.attr[2] == 'undefined'
+            ? ''
+            : item.attr[2];
+        if(!reg_captial.includes('万')){
+            companyType = reg_captial;
+            reg_captial = '';
+        }
+        return `(${provinceId},'${item.company_name}','${item.href}','${item.company_status}','${item.attr[0]}','${item.attr[1]}','${reg_captial}','${companyType}','${item.address}',0)`;
+    })
+
+    return sql + sqlValues.join(',');
 }
 
 module.exports = {
-    handleSaleDetailData
+    provinceList,
+    companyList
 }
