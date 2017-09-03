@@ -1,7 +1,11 @@
+/**
+ * 获取京东全国省/市/县 城市列表，与本项目无关
+ */
+
+
 let querystring = require('querystring');
 let axios = require('axios');
 
-let db = require('../db/qichacha');
 let util = require('../util/common');
 let query = require('../../schema/mysql');
 

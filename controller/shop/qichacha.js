@@ -1,7 +1,10 @@
+/**
+ * 获取企查查数据并存储
+ */
+
 let querystring = require('querystring');
 let axios = require('axios');
 
-let db = require('../db/qichacha');
 let util = require('../util/common');
 let query = require('../../schema/mysql');
 
@@ -12,13 +15,80 @@ let sqlParser = require('../util/sqlParser');
 let fs = require('fs');
 
 async function init() {
-  // 获取省份数据 await getProvinceIndex();
-  // let provinces = await getPorvFromDb();
-
-  // await getCompanyByProvince(provinces);
-  
+  // 获取并存储省份数据 await getProvinceIndex(); 从数据库中读取省份数据 let provinces = await
+  // getPorvFromDb(); 获取各省公司列表 await getCompanyByProvince(provinces);
+  // 从数据库中获取待处理详情的公司列表
+  await getCompanyFromDb();
 }
 
+function getCompanySqlByPage(page) {
+  return `SELECT id,concat('http://www.qichacha.com',href) href FROM companyindex where item_flag = 0 limit ${ (page - 1) * 100},100`;
+}
+
+// 从数据库中获取公司列表；
+async function getCompanyFromDb() {
+  let isFinished = false;
+  // 按100页获取数据
+  for (let i = 1; !isFinished; i++) {
+    console.log(`正在读取第${i}页数据，每页100条.`)
+    let companys = await query(getCompanySqlByPage(i));
+    if (companys.length < 100) {
+      isFinished = true;
+    }
+    for (let j = 0; j < companys.length; j++) {
+      await getCompanyDetail(companys[j]);
+      console.log(`第${j + 1}/${companys.length}条数据采集完毕`);
+    }
+  }
+}
+
+async function saveHtml2Disk(content, data) {
+  let fileName = util.getMainContent() + '/controller/data/html/' + content;
+  fs.writeFileSync(fileName, data, 'utf8');
+}
+
+// 抓取公司详情
+async function getCompanyDetail(company) {
+  let url = company.href;
+  let html = await axios({method: 'get', url, responseType: 'text'}).then(res => res.data);
+
+  let filename = url.replace('http://www.qichacha.com/', '');
+  saveHtml2Disk(filename, html);
+
+  await handleCompanyDetail(html,company.id);
+}
+
+async function handleCompanyDetail(html,cid) {
+
+  let companyDetail = parser.companyDetail(html);
+  let detail = companyDetail[0].baseInfo;
+  detail.title = companyDetail[0].title;
+  detail.address = companyDetail[0].contactInfo2.address;
+  detail.homepage = companyDetail[0].contactInfo2.homepage;
+  detail.tel = companyDetail[0].contactInfo.tel;
+  detail.email = companyDetail[0].contactInfo.email;
+  detail.updated_at = companyDetail[0].times.updated_at;
+  detail.rec_date = companyDetail[0].times.rec_date;
+
+  let sql = sqlParser.companyDetail(detail);
+  console.log(sql);
+  await query(sql);
+
+  let shareHolder = parser.shareHolder(html);
+  sql = sqlParser.shareholderDetail(shareHolder[0].data, cid);
+  console.log(sql);
+  await query(sql);
+
+  let managers = parser.managers(html);
+  sql = sqlParser.managerDetail(managers[0].data, cid);
+  console.log(sql);
+  await query(sql);
+  
+  let  sql = `update companyindex set item_flag=1 where id = ${cid}`;
+  await query(sql);
+}
+
+// 抓取省份列表（主列表）
 async function getProvinceIndex() {
   let homepage = settings.url.homepage;
   let provinceList = await axios
@@ -34,8 +104,13 @@ async function getProvinceIndex() {
   return provinceList;
 }
 
+// 获取省份列表（从数据库）
 async function getPorvFromDb() {
-  let sql = 'SELECT * from (select a.id,a.province,a.href,(case when b.page=0 then 1 when b.page is null then 1 else b.page+1 end) curPage,(case when a.pagenum=0 then 2 else a.pagenum end) totalPage from provinceindex a left JOIN (SELECT province_id,ceil(count(*)/10) page FROM `companyIndex` group by province_id) b on a.id = b.province_id   ) a where a.totalPage>a.curPage';
+  let sql = 'SELECT * from (select a.id,a.province,a.href,(case when b.page=0 then 1 when b.p' +
+      'age is null then 1 else b.page+1 end) curPage,(case when a.pagenum=0 then 2 else' +
+      ' a.pagenum end) totalPage from provinceindex a left JOIN (SELECT province_id,cei' +
+      'l(count(*)/10) page FROM `companyIndex` group by province_id) b on a.id = b.prov' +
+      'ince_id   ) a where a.totalPage>a.curPage';
   return await query(sql);
 }
 
@@ -43,12 +118,14 @@ function getProvinceUrl(href, p = 1) {
   return href.match('g_(.+).html')[1] + '&p=' + p;
 }
 
+// 抓取公司列表
 async function getCompanyByProvince(provinces) {
   for (let i = 0; i < provinces.length; i++) {
     await getCompanyData(provinces[i]);
   }
 }
 
+// 公司列表爬虫
 async function getCompanyData(item) {
 
   let totalPage = item.totalPage;
