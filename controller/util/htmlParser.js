@@ -198,7 +198,7 @@ let companyDetail = html => {
 
                     texts = handleTrHtml(el, 6);
                     baseInfo.verify_date = texts[0];
-                    baseInfo.english_name = texts[1];
+                    baseInfo.english_name = texts[1].replace("'",'');
 
                     texts = handleTrHtml(el, 7);
                     baseInfo.company_area = texts[0];

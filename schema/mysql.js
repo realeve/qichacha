@@ -30,19 +30,19 @@ async function query(sql, data, callback) {
             conn.query(sql, data, (err, result) => {
                 errorHandle(err, sql);
                 conn.release();
-                // try {
-                //     result = JSON.stringify(result);
-                //     result = JSON.parse(result);
-                //     if (typeof callback == 'function') {
-                //         callback(result);
-                //     }
-                //     resolve(result);
-                // } catch (e) {
-                //     mail.send({
-                //         subject: '数据库读写异常',
-                //         html: `${util.getNow()},errorInfo:<br>${e.message}<br> ${JSON.stringify(e)}<br>sql:${sql} `
-                //     });
-                // }
+                try {
+                    result = JSON.stringify(result);
+                    result = JSON.parse(result);
+                    if (typeof callback == 'function') {
+                        callback(result);
+                    }
+                    resolve(result);
+                } catch (e) {
+                    mail.send({
+                        subject: '数据库读写异常',
+                        html: `${util.getNow()},errorInfo:<br>${e.message}<br> ${JSON.stringify(e)}<br>sql:${sql} `
+                    });
+                }
             });
         });
     });

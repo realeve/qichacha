@@ -37,7 +37,10 @@ async function getCompanyFromDb() {
     }
     for (let j = 0; j < companys.length; j++) {
       await getCompanyDetail(companys[j]);
-      console.log(`第${j + 1}/${companys.length}条数据采集完毕`);
+      // 下次读取至少等待2.5-3秒
+      let sleepTimeLength = (4500 + Math.random() * 500).toFixed(0);
+      console.log(`第${j + 1}/${companys.length}条数据采集完毕,休息${sleepTimeLength}ms 后继续`);
+      await util.sleep(sleepTimeLength);
     }
   }
 }
@@ -55,10 +58,10 @@ async function getCompanyDetail(company) {
   let filename = url.replace('http://www.qichacha.com/', '');
   saveHtml2Disk(filename, html);
 
-  await handleCompanyDetail(html,company.id);
+  await handleCompanyDetail(html, company.id);
 }
 
-async function handleCompanyDetail(html,cid) {
+async function handleCompanyDetail(html, cid) {
 
   let companyDetail = parser.companyDetail(html);
   let detail = companyDetail[0].baseInfo;
@@ -72,19 +75,28 @@ async function handleCompanyDetail(html,cid) {
 
   let sql = sqlParser.companyDetail(detail);
   console.log(sql);
-  await query(sql);
+  let inserts = await query(sql);
 
   let shareHolder = parser.shareHolder(html);
-  sql = sqlParser.shareholderDetail(shareHolder[0].data, cid);
-  console.log(sql);
-  await query(sql);
+  if (shareHolder[0].data.length) {
+    sql = sqlParser.shareholderDetail(shareHolder[0].data, inserts.insertId);
+    //  console.log(sql);
+
+    if (!sql.includes('undefined')) {
+      await query(sql);
+    }
+  }
 
   let managers = parser.managers(html);
-  sql = sqlParser.managerDetail(managers[0].data, cid);
-  console.log(sql);
-  await query(sql);
-  
-  let  sql = `update companyindex set item_flag=1 where id = ${cid}`;
+  if (managers[0].data.length) {
+    sql = sqlParser.managerDetail(managers[0].data, inserts.insertId);
+    // console.log(sql);
+    if (!sql.includes('undefined')) {
+      await query(sql);
+    }
+  }
+
+  sql = `update companyindex set item_flag=1 where id = ${cid}`;
   await query(sql);
 }
 
