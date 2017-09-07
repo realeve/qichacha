@@ -24,6 +24,9 @@ async function init() {
 }
 
 function getCompanySqlByPage(page) {
+  // 多线程，将id取余则可多个线程同时取数
+  // SELECT id,concat('http://www.qichacha.com',href) href FROM companyindex where item_flag = 0 and id%10 = 1
+
   return `SELECT id,concat('http://www.qichacha.com',href) href FROM companyindex where item_flag = 0 limit ${ (page - 1) * 100},100`;
 }
 
@@ -59,10 +62,15 @@ async function saveHtml2Disk(content, data) {
 }
 
 // 获取代理配置
+// '222.196.33.254':3128 可用
+// '112.193.252.134'8998 可用
+// '122.72.32.82:80
+// 122.72.32.84
+// 122.72.32.83
 function getProxy(i){
   // return {
-  //   host: '61.144.102.240',
-  //   port: 53281
+  //   host: '222.196.33.254'
+  //   port: 3128
   // }
   console.log(proxyList.proxy[i]);
   return proxyList.proxy[i];
@@ -72,7 +80,7 @@ function getProxy(i){
 async function getCompanyDetail(company) {
   let url = company.href;
 
-  let proxyIdx = 22;
+  let proxyIdx = 39;
 
   let option = {
     method: 'get',
