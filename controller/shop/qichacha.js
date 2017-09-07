@@ -14,6 +14,8 @@ let settings = require('../util/urlList.js');
 let sqlParser = require('../util/sqlParser');
 let fs = require('fs');
 
+let proxyList = require('../util/proxyList');
+
 async function init() {
   // 获取并存储省份数据 await getProvinceIndex(); 从数据库中读取省份数据 let provinces = await
   // getPorvFromDb(); 获取各省公司列表 await getCompanyByProvince(provinces);
@@ -36,9 +38,15 @@ async function getCompanyFromDb() {
       isFinished = true;
     }
     for (let j = 0; j < companys.length; j++) {
-      await getCompanyDetail(companys[j]);
+      let havedata = await getCompanyDetail(companys[j]);
+      if(!havedata){
+        j = companys.length;
+        isFinished = true;
+        console.log('数据抓取错误，请重启线程')
+        return;
+      }
       // 下次读取至少等待2.5-3秒
-      let sleepTimeLength = (4500 + Math.random() * 500).toFixed(0);
+      let sleepTimeLength = (1000 + Math.random() * 200).toFixed(0);
       console.log(`第${j + 1}/${companys.length}条数据采集完毕,休息${sleepTimeLength}ms 后继续`);
       await util.sleep(sleepTimeLength);
     }
@@ -50,15 +58,45 @@ async function saveHtml2Disk(content, data) {
   fs.writeFileSync(fileName, data, 'utf8');
 }
 
+// 获取代理配置
+function getProxy(i){
+  // return {
+  //   host: '61.144.102.240',
+  //   port: 53281
+  // }
+  console.log(proxyList.proxy[i]);
+  return proxyList.proxy[i];
+}
+
 // 抓取公司详情
 async function getCompanyDetail(company) {
   let url = company.href;
-  let html = await axios({method: 'get', url, responseType: 'text'}).then(res => res.data);
+
+  let proxyIdx = 22;
+
+  let option = {
+    method: 'get',
+    url,
+    responseType: 'text',
+    proxy: getProxy(proxyIdx)
+  };
+  let html = await axios(option)
+    .then(res => res.data)
+    .catch(e => {
+      console.log('数据抓取失败');
+      console.log(e.message);
+      return '';
+    })
+    if(html == '' || html.slice(0,8) == '<script>'){
+      console.log(html);
+      return false;
+    }
 
   let filename = url.replace('http://www.qichacha.com/', '');
   saveHtml2Disk(filename, html);
 
   await handleCompanyDetail(html, company.id);
+  return true;
 }
 
 async function handleCompanyDetail(html, cid) {
@@ -74,7 +112,7 @@ async function handleCompanyDetail(html, cid) {
   detail.rec_date = companyDetail[0].times.rec_date;
 
   let sql = sqlParser.companyDetail(detail);
-  console.log(sql);
+  // console.log(sql);
   let inserts = await query(sql);
 
   let shareHolder = parser.shareHolder(html);
