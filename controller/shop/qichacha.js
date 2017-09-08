@@ -16,7 +16,7 @@ let fs = require('fs');
 
 let proxyList = require('../util/proxyList');
 
-let proxyIdx = 80;
+let proxyIdx = 1;
 let publicProxy = {};
 
 async function init() {
@@ -51,6 +51,7 @@ async function getCompanyFromDb() {
         proxyIdx++;
         if (proxyIdx == proxyList.length - 1) {
           isFinished = true;
+          j = companys.length;
           break;
         }
         console.log('数据抓取失败，将启用下一个代理结点。')

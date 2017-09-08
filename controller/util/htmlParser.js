@@ -198,7 +198,7 @@ let companyDetail = html => {
 
                     texts = handleTrHtml(el, 6);
                     baseInfo.verify_date = texts[0];
-                    baseInfo.english_name = texts[1].replace("'",'');
+                    baseInfo.english_name = texts[1].replace("'", '');
 
                     texts = handleTrHtml(el, 7);
                     baseInfo.company_area = texts[0];
@@ -329,11 +329,42 @@ let managers = html => {
     return util.parseHTML(options)
 }
 
+let xiciProxy = html => {
+    let options = {
+        html,
+        parentNode: '#ip_list',
+        children: [
+            {
+                node: 'tr',
+                name: 'data',
+                formatter(trs) {
+                    let data = [];
+                    for (let i = 1; i < trs.length; i++) {
+                        let td = trs.eq(i).find('td');
+                        data.push({
+                            host: td
+                                .eq(1)
+                                .text(),
+                            port: td
+                                .eq(2)
+                                .text(),
+                            status: 0
+                        });
+                    }
+                    return data;
+                }
+            }
+        ]
+    }
+    return util.parseHTML(options)
+}
+
 module.exports = {
     province,
     company,
     companyPage,
     companyDetail,
     shareHolder,
-    managers
+    managers,
+    xiciProxy
 }
