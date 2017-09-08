@@ -16,6 +16,9 @@ let fs = require('fs');
 
 let proxyList = require('../util/proxyList');
 
+let proxyIdx = 65;
+let publicProxy = {};
+
 async function init() {
   // 获取并存储省份数据 await getProvinceIndex(); 从数据库中读取省份数据 let provinces = await
   // getPorvFromDb(); 获取各省公司列表 await getCompanyByProvince(provinces);
@@ -24,8 +27,8 @@ async function init() {
 }
 
 function getCompanySqlByPage(page) {
-  // 多线程，将id取余则可多个线程同时取数
-  // SELECT id,concat('http://www.qichacha.com',href) href FROM companyindex where item_flag = 0 and id%10 = 1
+  // 多线程，将id取余则可多个线程同时取数 SELECT id,concat('http://www.qichacha.com',href) href
+  // FROM companyindex where item_flag = 0 and id%10 = 1
 
   return `SELECT id,concat('http://www.qichacha.com',href) href FROM companyindex where item_flag = 0 limit ${ (page - 1) * 100},100`;
 }
@@ -40,20 +43,38 @@ async function getCompanyFromDb() {
     if (companys.length < 100) {
       isFinished = true;
     }
-    for (let j = 0; j < companys.length; j++) {
+    for (let j = 0; j < companys.length;) {
       let havedata = await getCompanyDetail(companys[j]);
-      if(!havedata){
-        j = companys.length;
-        isFinished = true;
-        console.log('数据抓取错误，请重启线程')
-        return;
+
+      // 如果数据加载失败，切换代理，继续抓取
+      if (!havedata) {
+        proxyIdx++;
+        if (proxyIdx == proxyList.length - 1) {
+          isFinished = true;
+          break;
+        }
+        console.log('数据抓取失败，将启用下一个代理结点。')
+        continue;
+      } else {
+        // if (!havedata) {   isFinished = true;   break;   console.log('数据抓取错误，请重启线程')
+        // return; } 下次读取至少等待2.5-3秒
+        let sleepTimeLength = (1000 + Math.random() * 200).toFixed(0);
+        console.log(`第${j + 1}/${companys.length}条数据采集完毕,休息${sleepTimeLength}ms 后继续`);
+        // await util.sleep(sleepTimeLength);
+
+        if (j == 1) {
+          publicProxy.status = 1;
+          await recordProxyInfo(publicProxy);
+        }
+        j++;
       }
-      // 下次读取至少等待2.5-3秒
-      let sleepTimeLength = (1000 + Math.random() * 200).toFixed(0);
-      console.log(`第${j + 1}/${companys.length}条数据采集完毕,休息${sleepTimeLength}ms 后继续`);
-      await util.sleep(sleepTimeLength);
     }
   }
+}
+
+async function recordProxyInfo(proxy) {
+  let sql = `insert into proxyList(host,port,status) values('${proxy.host}','${proxy.port}',${proxy.status})`;
+  await query(sql);
 }
 
 async function saveHtml2Disk(content, data) {
@@ -61,32 +82,26 @@ async function saveHtml2Disk(content, data) {
   fs.writeFileSync(fileName, data, 'utf8');
 }
 
-// 获取代理配置
-// '222.196.33.254':3128 可用
-// '112.193.252.134'8998 可用
-// '122.72.32.82:80
-// 122.72.32.84
-// 122.72.32.83
-function getProxy(i){
-  // return {
-  //   host: '222.196.33.254'
-  //   port: 3128
-  // }
-  console.log(proxyList.proxy[i]);
-  return proxyList.proxy[i];
+// 获取代理配置 '222.196.33.254':3128 可用 '122.72.32.82:80 122.72.32.84 122.72.32.83
+function getProxy(i) {
+  // return {   host: '222.196.33.254',   port: 3128 }
+  console.log('正在使用代理' + i + '获取数据:\n', proxyList.proxy[i]);
+  publicProxy = proxyList.proxy[i];
+  return publicProxy;
 }
 
 // 抓取公司详情
 async function getCompanyDetail(company) {
   let url = company.href;
-
-  let proxyIdx = 39;
+  // 7,
 
   let option = {
     method: 'get',
     url,
     responseType: 'text',
-    proxy: getProxy(proxyIdx)
+    proxy: getProxy(proxyIdx),
+    'User-Agent': ' Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko' +
+        ') Chrome/60.0.3112.113 Safari/537.36'
   };
   let html = await axios(option)
     .then(res => res.data)
@@ -94,11 +109,17 @@ async function getCompanyDetail(company) {
       console.log('数据抓取失败');
       console.log(e.message);
       return '';
-    })
-    if(html == '' || html.slice(0,8) == '<script>'){
-      console.log(html);
-      return false;
-    }
+    });
+
+  if (html == '') {
+    console.log(html);
+    return false;
+  } else if (html.slice(0, 8) == '<script>') {
+    console.log(html);
+    publicProxy.status = 2;
+    await recordProxyInfo(publicProxy);
+    return false;
+  }
 
   let filename = url.replace('http://www.qichacha.com/', '');
   saveHtml2Disk(filename, html);
