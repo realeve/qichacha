@@ -16,7 +16,7 @@ let fs = require('fs');
 
 let proxyList = require('../util/proxyList');
 
-let proxyIdx = 65;
+let proxyIdx = 80;
 let publicProxy = {};
 
 async function init() {
@@ -101,8 +101,12 @@ async function getCompanyDetail(company) {
     responseType: 'text',
     proxy: getProxy(proxyIdx),
     'User-Agent': ' Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko' +
-        ') Chrome/60.0.3112.113 Safari/537.36'
+        ') Chrome/60.0.3112.113 Safari/537.36',
+    timeout: 3000
   };
+
+  // 2s以内代理连接失效，自动转换
+
   let html = await axios(option)
     .then(res => res.data)
     .catch(e => {
