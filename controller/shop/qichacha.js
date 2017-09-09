@@ -21,10 +21,11 @@ let proxyIdx = [];
 let publicProxy = [];
 
 // 代理列表表单名，区分淘宝购买与免费爬取的列表
-const PROXY_TBL_NAME = 'proxy_list_taobao';// 'proxyList';
+// const PROXY_TBL_NAME =  'proxyList'; 
+const PROXY_TBL_NAME = 'proxy_list_taobao';
 
 // 10进程并发取数
-const THREAD_NUM = 10;
+const THREAD_NUM = 50;
 
 async function init() {
   // 获取并存储省份数据 await getProvinceIndex(); 从数据库中读取省份数据 let provinces = await
@@ -42,7 +43,7 @@ async function init() {
 }
 
 async function getProxyListFromDb(CUR_THREAD_IDX){
-  proxyList[CUR_THREAD_IDX] = await query(`select * from ${PROXY_TBL_NAME} where  id%${THREAD_NUM} = ${CUR_THREAD_IDX}`);
+  proxyList[CUR_THREAD_IDX] = await query(`select * from ${PROXY_TBL_NAME} where id>800 and (id+${THREAD_NUM})%${THREAD_NUM} = ${CUR_THREAD_IDX}`);
 }
 
 function getCompanySqlByPage(CUR_THREAD_IDX,page) {
@@ -143,6 +144,11 @@ async function getCompanyDetail(company,CUR_THREAD_IDX) {
   } else if (html.slice(0, 8) == '<script>') {
     console.log('线程'+CUR_THREAD_IDX,html);
     publicProxy[CUR_THREAD_IDX].status = 2;
+    await recordProxyInfo(publicProxy[CUR_THREAD_IDX]);
+    return false;
+  }else if (html.slice(0,14) == '<html><script>' || html.includes('http://www.baidu.com/search/error.html')){
+    console.log('线程'+CUR_THREAD_IDX);
+    publicProxy[CUR_THREAD_IDX].status = 3;
     await recordProxyInfo(publicProxy[CUR_THREAD_IDX]);
     return false;
   }
