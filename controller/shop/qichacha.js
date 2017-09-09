@@ -25,7 +25,7 @@ let publicProxy = [];
 const PROXY_TBL_NAME = 'proxy_list_taobao';
 
 // 10进程并发取数
-const THREAD_NUM = 300;
+const THREAD_NUM = 100;
 
 async function init() {
   // 获取并存储省份数据 await getProvinceIndex(); 从数据库中读取省份数据 let provinces = await
@@ -48,7 +48,7 @@ function getRndInt(){
 }
 
 async function getProxyListFromDb(CUR_THREAD_IDX){
-  let sql = `select a.id,a.host,a.port,a.status from (select @rownum:=@rownum+1 as rownum, b.* from (select @rownum:=0) a,${PROXY_TBL_NAME} b where b.status>=-1) a where (a.rownum)%${THREAD_NUM} = ${CUR_THREAD_IDX}`;
+  let sql = `select a.id,a.host,a.port,a.status from (select @rownum:=@rownum+1 as rownum, b.* from (select @rownum:=0) a,${PROXY_TBL_NAME} b where b.id>5000) a where (a.rownum)%${THREAD_NUM} = ${CUR_THREAD_IDX}`;
   // `select * from ${PROXY_TBL_NAME} where status = 0 and (id+${THREAD_NUM})%${THREAD_NUM} = ${CUR_THREAD_IDX}`
 
   proxyList[CUR_THREAD_IDX] = await query(sql);
