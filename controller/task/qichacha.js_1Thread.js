@@ -17,11 +17,8 @@ let fs = require('fs');
 // let proxyList = require('../util/proxyList');
 
 let proxyList = [];
-let proxyIdx = [];
-let publicProxy = [];
-
-// 代理列表表单名，区分淘宝购买与免费爬取的列表
-const PROXY_TBL_NAME = 'proxy_list_taobao';// 'proxyList';
+let proxyIdx = 1;
+let publicProxy = {};
 
 // 10进程并发取数
 const THREAD_NUM = 10;
@@ -31,44 +28,39 @@ async function init() {
   // getPorvFromDb(); 获取各省公司列表 await getCompanyByProvince(provinces);
   
   // 从数据库中获取待处理详情的公司列表
-  for(let i=0;i<THREAD_NUM;i++){
-    proxyIdx.push(1);
-    publicProxy.push({});
+  await getProxyListFromDb();
 
-    let CUR_THREAD_IDX = i;
-    await getProxyListFromDb(CUR_THREAD_IDX);  
-    getCompanyFromDb(CUR_THREAD_IDX);
-  }
+  await getCompanyFromDb();
 }
 
-async function getProxyListFromDb(CUR_THREAD_IDX){
-  proxyList[CUR_THREAD_IDX] = await query(`select * from ${PROXY_TBL_NAME} where  id%${THREAD_NUM} = ${CUR_THREAD_IDX}`);
+async function getProxyListFromDb(){
+  proxyList = await query('select * from proxyList where status <>-1');
 }
 
-function getCompanySqlByPage(CUR_THREAD_IDX,page) {
+function getCompanySqlByPage(page) {
   // 多线程，将id取余则可多个线程同时取数 SELECT id,concat('http://www.qichacha.com',href) href
   // FROM companyindex where item_flag = 0 and id%10 = 1
 
-  return `SELECT id,concat('http://www.qichacha.com',href) href FROM companyindex where item_flag = 0 and id%${THREAD_NUM} = ${CUR_THREAD_IDX} limit ${ (page - 1) * 100},100`;
+  return `SELECT id,concat('http://www.qichacha.com',href) href FROM companyindex where item_flag = 0 limit ${ (page - 1) * 100},100`;
 }
 
 // 从数据库中获取公司列表；
-async function getCompanyFromDb(CUR_THREAD_IDX) {
+async function getCompanyFromDb() {
   let isFinished = false;
   // 按100页获取数据
   for (let i = 1; !isFinished; i++) {
-    console.log(`线程${CUR_THREAD_IDX}正在读取第${i}页数据，每页100条.`)
-    let companys = await query(getCompanySqlByPage(CUR_THREAD_IDX,i));
+    console.log(`正在读取第${i}页数据，每页100条.`)
+    let companys = await query(getCompanySqlByPage(i));
     if (companys.length < 100) {
       isFinished = true;
     }
     for (let j = 0; j < companys.length;) {
-      let havedata = await getCompanyDetail(companys[j],CUR_THREAD_IDX);
+      let havedata = await getCompanyDetail(companys[j]);
 
       // 如果数据加载失败，切换代理，继续抓取
       if (!havedata) {
-        proxyIdx[CUR_THREAD_IDX]++;
-        if (proxyIdx[CUR_THREAD_IDX] == proxyList[CUR_THREAD_IDX].length - 1) {
+        proxyIdx++;
+        if (proxyIdx == proxyList.length - 1) {
           isFinished = true;
           j = companys.length;
           break;
@@ -82,8 +74,8 @@ async function getCompanyFromDb(CUR_THREAD_IDX) {
         console.log(`第${j + 1}/${companys.length}条数据采集完毕,休息${sleepTimeLength}ms 后继续`);
         // await util.sleep(sleepTimeLength);
 
-        publicProxy[CUR_THREAD_IDX].status = 1;
-        await recordProxyInfo(publicProxy[CUR_THREAD_IDX]);
+        publicProxy.status = 1;
+        await recordProxyInfo(publicProxy);
         j++;
       }
     }
@@ -91,7 +83,7 @@ async function getCompanyFromDb(CUR_THREAD_IDX) {
 }
 
 async function recordProxyInfo(proxy) {
-  let sql = `update ${PROXY_TBL_NAME} set status = ${proxy.status} where id=${proxy.id} and status=0`;
+  let sql = `update proxyList set status = ${proxy.status} where id=${proxy.id} and status=0`;
   query(sql);
   console.log('sql executed finish');
 }
@@ -102,61 +94,59 @@ async function saveHtml2Disk(content, data) {
 }
 
 // 获取代理配置 '222.196.33.254':3128 可用 '122.72.32.82:80 122.72.32.84 122.72.32.83
-function getProxy(i,CUR_THREAD_IDX) {
+function getProxy(i) {
   // return {   host: '222.196.33.254',   port: 3128 }
   console.log('正在使用代理' + i + '获取数据:\n');
-  publicProxy[CUR_THREAD_IDX] = proxyList[CUR_THREAD_IDX][i];
-  return publicProxy[CUR_THREAD_IDX];
+  publicProxy = proxyList[i];
+  return publicProxy;
 }
 
 // 抓取公司详情
-async function getCompanyDetail(company,CUR_THREAD_IDX) {
+async function getCompanyDetail(company) {
   let url = company.href;
 
   let option = {
     method: 'get',
     url,
     responseType: 'text',
-    proxy: getProxy(proxyIdx[CUR_THREAD_IDX],CUR_THREAD_IDX),
-    // 'User-Agent': ' Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko' +
-    //     ') Chrome/60.0.3112.113 Safari/537.36',
-    Refer:'http://www.qichacha.com/index_verify?type=companyview&back=/firm'+url.split('firm')[1],
-    'User-Agent':'Mozilla/5.0 (Linux; Android 5.1.1; Nexus 6 Build/LYZ28E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Mobile Safari/537.36',
-    timeout: 10000,
-   // 'Cookie':'acw_tc=AQAAANK84EdEagsAwhfU3tVQtsdsqnlR; PHPSESSID=hi2dsvv84kmojhtugturjjdlj1; zg_did=%7B%22did%22%3A%20%2215e648af99fc2c-006ccf8c873ac6-7b4a457d-49a10-15e648af9a08bf%22%7D; zg_de1d1a35bfa24ce29bbf2c7eb17e6c4f=%7B%22sid%22%3A%201504925383074%2C%22updated%22%3A%201504925383077%2C%22info%22%3A%201504925383076%2C%22superProperty%22%3A%20%22%7B%7D%22%2C%22platform%22%3A%20%22%7B%7D%22%2C%22utm%22%3A%20%22%7B%7D%22%2C%22referrerDomain%22%3A%20%22www.qichacha.com%22%7D; UM_distinctid=15e648afa754ae-068cfefc5ae691-7b4a457d-49a10-15e648afa76a30; CNZZDATA1254842228=97650014-1504923112-null%7C1504923112; _uab_collina=150492538335327593229124'
+    proxy: getProxy(proxyIdx),
+    'User-Agent': ' Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko' +
+        ') Chrome/60.0.3112.113 Safari/537.36',
+    timeout: 3000
   };
-  console.log('线程'+CUR_THREAD_IDX,option.proxy);
+  console.log(option.proxy);
   // 2s以内代理连接失效，自动转换
 
   let html = await axios(option)
     .then(res => res.data)
     .catch(e => {
-      console.log('线程'+CUR_THREAD_IDX+'数据抓取失败');
+      console.log('数据抓取失败');
       console.log(e.message);
       return '';
     });
-  console.log('线程'+CUR_THREAD_IDX+'数据获取完毕');
+  console.log('数据获取完毕');
   if (html == '') {
-    publicProxy[CUR_THREAD_IDX].status = -1;
-    await recordProxyInfo(publicProxy[CUR_THREAD_IDX]);
+    console.log(html);
+    publicProxy.status = -1;
+    await recordProxyInfo(publicProxy);
     return false;
   } else if (html.slice(0, 8) == '<script>') {
-    console.log('线程'+CUR_THREAD_IDX,html);
-    publicProxy[CUR_THREAD_IDX].status = 2;
-    await recordProxyInfo(publicProxy[CUR_THREAD_IDX]);
+    console.log(html);
+    publicProxy.status = 2;
+    await recordProxyInfo(publicProxy);
     return false;
   }
 
   let filename = url.replace('http://www.qichacha.com/', '');
   saveHtml2Disk(filename, html);
 
-  console.log('线程'+CUR_THREAD_IDX+'存储至本地硬盘');
+  console.log('存储至本地硬盘');
 
   let result = await handleCompanyDetail(html, company.id).catch(e=>{
     console.log(e.message);
     return false;
   }).then(res=>true);
-  console.log('线程'+CUR_THREAD_IDX+'处理非结构化数据');
+  console.log('处理非结构化数据完毕');
   return result;
 }
 

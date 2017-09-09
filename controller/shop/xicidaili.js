@@ -12,13 +12,38 @@ async function init() {
     getXiciProxyList();
 }
 
-async function getXiciProxyList() {
-    for (let i = 2; i < 107; i++) {
-        let html = getHtmlFromDisk(i);
-        await handleProxyHtml(html, i);
+async function getProxyListFromXici(){
+    // 读写sql
+    for(let i=1;i<=100;i++){
+        await getProxyInfo(i);
+        let sleepTimeLength = (1000 + Math.random() * 200).toFixed(0);
+        console.log(`第${i}/${100}页数据采集完毕,休息${sleepTimeLength}ms 后继续`);
+        await util.sleep(sleepTimeLength);
+    }
+    // 入库
+    for (let i = 1; i <= 100; i++) {
+        let fileName = util.getMainContent() + '/controller/data/xici/page_' + i+'.sql';
+        let sql = fs.readFileSync(fileName, 'utf-8')
+        await query(sql);
     }
 }
 
+async function getXiciProxyList() {
+    // for (let i = 2; i < 107; i++) {
+    //     let html = getHtmlFromDisk(i);
+    //     await handleProxyHtml(html, i);
+    // }
+    
+    // let html = getHtmlFromDisk(1);
+    // await handleProxyHtml(html, 1);
+
+    for (let i = 1; i < 107; i++) {
+        let fileName = util.getMainContent() + '/controller/data/xici/page_' + i+'.sql';
+        let sql = fs.readFileSync(fileName, 'utf-8')
+        await query(sql);
+    }
+
+}
 function getProxySql(proxyList) {
     let sql = `insert into proxyList(host,port,status) values `;
     let strs = proxyList.map(proxy => {
