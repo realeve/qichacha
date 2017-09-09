@@ -25,32 +25,40 @@ let publicProxy = [];
 const PROXY_TBL_NAME = 'proxy_list_taobao';
 
 // 10进程并发取数
-const THREAD_NUM = 50;
+const THREAD_NUM = 300;
 
 async function init() {
   // 获取并存储省份数据 await getProvinceIndex(); 从数据库中读取省份数据 let provinces = await
   // getPorvFromDb(); 获取各省公司列表 await getCompanyByProvince(provinces);
   
   // 从数据库中获取待处理详情的公司列表
-  for(let i=0;i<THREAD_NUM;i++){
+  for(let i=0;i<=THREAD_NUM;i++){
     proxyIdx.push(1);
     publicProxy.push({});
-
+  }
+  for(let i=0;i<THREAD_NUM;i++){
     let CUR_THREAD_IDX = i;
     await getProxyListFromDb(CUR_THREAD_IDX);  
     getCompanyFromDb(CUR_THREAD_IDX);
   }
 }
 
+function getRndInt(){
+  return Math.ceil(Math.random()*10+1);
+}
+
 async function getProxyListFromDb(CUR_THREAD_IDX){
-  proxyList[CUR_THREAD_IDX] = await query(`select * from ${PROXY_TBL_NAME} where id>800 and (id+${THREAD_NUM})%${THREAD_NUM} = ${CUR_THREAD_IDX}`);
+  let sql = `select a.id,a.host,a.port,a.status from (select @rownum:=@rownum+1 as rownum, b.* from (select @rownum:=0) a,${PROXY_TBL_NAME} b where b.status>=-1) a where (a.rownum)%${THREAD_NUM} = ${CUR_THREAD_IDX}`;
+  // `select * from ${PROXY_TBL_NAME} where status = 0 and (id+${THREAD_NUM})%${THREAD_NUM} = ${CUR_THREAD_IDX}`
+
+  proxyList[CUR_THREAD_IDX] = await query(sql);
 }
 
 function getCompanySqlByPage(CUR_THREAD_IDX,page) {
   // 多线程，将id取余则可多个线程同时取数 SELECT id,concat('http://www.qichacha.com',href) href
   // FROM companyindex where item_flag = 0 and id%10 = 1
-
-  return `SELECT id,concat('http://www.qichacha.com',href) href FROM companyindex where item_flag = 0 and id%${THREAD_NUM} = ${CUR_THREAD_IDX} limit ${ (page - 1) * 100},100`;
+  return `select * from (select @rownum:=@rownum+1 rownum,a.* from (SELECT b.id,concat('http://www.qichacha.com',b.href) href FROM (select @rownum:=0) a,companyindex b where b.item_flag = 0) a) a where a.rownum%${THREAD_NUM} = ${CUR_THREAD_IDX} limit ${ (page - 1) * 100},100`;
+  // return `SELECT id,concat('http://www.qichacha.com',href) href FROM companyindex where item_flag = 0 and id%${THREAD_NUM} = ${CUR_THREAD_IDX} limit ${ (page - 1) * 100},100`;
 }
 
 // 从数据库中获取公司列表；
@@ -59,7 +67,8 @@ async function getCompanyFromDb(CUR_THREAD_IDX) {
   // 按100页获取数据
   for (let i = 1; !isFinished; i++) {
     console.log(`线程${CUR_THREAD_IDX}正在读取第${i}页数据，每页100条.`)
-    let companys = await query(getCompanySqlByPage(CUR_THREAD_IDX,i));
+    let sql = getCompanySqlByPage(CUR_THREAD_IDX,i);
+    let companys = await query(sql);
     if (companys.length < 100) {
       isFinished = true;
     }
@@ -123,12 +132,15 @@ async function getCompanyDetail(company,CUR_THREAD_IDX) {
     //     ') Chrome/60.0.3112.113 Safari/537.36',
     Refer:'http://www.qichacha.com/index_verify?type=companyview&back=/firm'+url.split('firm')[1],
     'User-Agent':'Mozilla/5.0 (Linux; Android 5.1.1; Nexus 6 Build/LYZ28E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Mobile Safari/537.36',
-    timeout: 10000,
+    timeout: 5000,
    // 'Cookie':'acw_tc=AQAAANK84EdEagsAwhfU3tVQtsdsqnlR; PHPSESSID=hi2dsvv84kmojhtugturjjdlj1; zg_did=%7B%22did%22%3A%20%2215e648af99fc2c-006ccf8c873ac6-7b4a457d-49a10-15e648af9a08bf%22%7D; zg_de1d1a35bfa24ce29bbf2c7eb17e6c4f=%7B%22sid%22%3A%201504925383074%2C%22updated%22%3A%201504925383077%2C%22info%22%3A%201504925383076%2C%22superProperty%22%3A%20%22%7B%7D%22%2C%22platform%22%3A%20%22%7B%7D%22%2C%22utm%22%3A%20%22%7B%7D%22%2C%22referrerDomain%22%3A%20%22www.qichacha.com%22%7D; UM_distinctid=15e648afa754ae-068cfefc5ae691-7b4a457d-49a10-15e648afa76a30; CNZZDATA1254842228=97650014-1504923112-null%7C1504923112; _uab_collina=150492538335327593229124'
   };
   console.log('线程'+CUR_THREAD_IDX,option.proxy);
   // 2s以内代理连接失效，自动转换
-
+  if(typeof option.proxy == 'undefined'){
+    console.log('线程'+CUR_THREAD_IDX+'代理读取失败');
+    return false;
+  }
   let html = await axios(option)
     .then(res => res.data)
     .catch(e => {
