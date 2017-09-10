@@ -38,6 +38,7 @@ async function query(sql, data, callback) {
                     }
                     resolve(result);
                 } catch (e) {
+                    console.log(e);
                     mail.send({
                         subject: '数据库读写异常',
                         html: `${util.getNow()},errorInfo:<br>${e.message}<br> ${JSON.stringify(e)}<br>sql:${sql} `

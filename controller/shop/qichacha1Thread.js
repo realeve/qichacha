@@ -26,14 +26,13 @@ const THREAD_NUM = 10;
 async function init() {
   // 获取并存储省份数据 await getProvinceIndex(); 从数据库中读取省份数据 let provinces = await
   // getPorvFromDb(); 获取各省公司列表 await getCompanyByProvince(provinces);
-  
   // 从数据库中获取待处理详情的公司列表
   await getProxyListFromDb();
 
   await getCompanyFromDb();
 }
 
-async function getProxyListFromDb(){
+async function getProxyListFromDb() {
   proxyList = await query('select * from proxyList where status <>-1');
 }
 
@@ -71,7 +70,7 @@ async function getCompanyFromDb() {
         // if (!havedata) {   isFinished = true;   break;   console.log('数据抓取错误，请重启线程')
         // return; } 下次读取至少等待2.5-3秒
         let sleepTimeLength = (1000 + Math.random() * 200).toFixed(0);
-        console.log(`第${j + 1}/${companys.length}条数据采集完毕,休息${sleepTimeLength}ms 后继续`);
+        console.log(`第${j + 1}/${companys.length}条数据采集完毕`);
         // await util.sleep(sleepTimeLength);
 
         publicProxy.status = 1;
@@ -109,13 +108,13 @@ async function getCompanyDetail(company) {
     method: 'get',
     url,
     responseType: 'text',
-    proxy: getProxy(proxyIdx),
-    'User-Agent': ' Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko' +
-        ') Chrome/60.0.3112.113 Safari/537.36',
+    // proxy: getProxy(proxyIdx),
+    Refer: 'http://www.qichacha.com/index_verify?type=companyview&back=/firm' + url.split('firm')[1],
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 5.1.1; Nexus 6 Build/LYZ28E) AppleWebKit/537.36 (KHT' +
+        'ML, like Gecko) Chrome/60.0.3112.113 Mobile Safari/537.36',
     timeout: 3000
   };
-  console.log(option.proxy);
-  // 2s以内代理连接失效，自动转换
+  // console.log(option.proxy); 2s以内代理连接失效，自动转换
 
   let html = await axios(option)
     .then(res => res.data)
@@ -124,29 +123,25 @@ async function getCompanyDetail(company) {
       console.log(e.message);
       return '';
     });
-  console.log('数据获取完毕');
+ // console.log('数据获取完毕');
   if (html == '') {
     console.log(html);
-    publicProxy.status = -1;
-    await recordProxyInfo(publicProxy);
+    // publicProxy.status = -1; await recordProxyInfo(publicProxy);
     return false;
   } else if (html.slice(0, 8) == '<script>') {
     console.log(html);
-    publicProxy.status = 2;
-    await recordProxyInfo(publicProxy);
+    // publicProxy.status = 2; await recordProxyInfo(publicProxy);
     return false;
   }
 
-  let filename = url.replace('http://www.qichacha.com/', '');
-  saveHtml2Disk(filename, html);
+  // let filename = url.replace('http://www.qichacha.com/', '');
+  // saveHtml2Disk(filename, html); console.log('存储至本地硬盘');
 
-  console.log('存储至本地硬盘');
-
-  let result = await handleCompanyDetail(html, company.id).catch(e=>{
+  let result = await handleCompanyDetail(html, company.id).catch(e => {
     console.log(e.message);
     return false;
-  }).then(res=>true);
-  console.log('处理非结构化数据完毕');
+  }).then(res => true);
+ // console.log('处理非结构化数据完毕');
   return result;
 }
 
@@ -169,7 +164,7 @@ async function handleCompanyDetail(html, cid) {
   let shareHolder = parser.shareHolder(html);
   if (shareHolder[0].data.length) {
     sql = sqlParser.shareholderDetail(shareHolder[0].data, inserts.insertId);
-    //  console.log(sql);
+    // console.log(sql);
 
     if (!sql.includes('undefined')) {
       await query(sql);

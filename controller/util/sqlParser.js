@@ -36,7 +36,7 @@ function companyDetail(detail) {
             'date,company_type,personnel_scale,expired_date,register_org,verify_date,english_' +
             'name,company_area,company_industry,old_name,company_address,business_scope) valu' +
             'es';
-    let value = `('${detail.title}','${detail.tel}','${detail.email}','${detail.homepage}','${detail.address}','${detail.updated_at}','${detail.rec_date}','${detail.usc_sn}','${detail.tax_sn}','${detail.register_sn}','${detail.org_sn}','${detail.legeal_name}','${detail.reg_captial}','${detail.manage_status}','${detail.register_date}','${detail.company_type}','${detail.personnel_scale}','${detail.expired_date}','${detail.register_org}','${detail.verify_date}','${detail.english_name}','${detail.company_area}','${detail.company_industry}','${detail.old_name}','${detail.company_address}','${detail.business_scope}')`;
+    let value = `('${detail.title}','${detail.tel}','${detail.email}','${detail.homepage}','${detail.address}','${detail.updated_at}','${detail.rec_date}','${detail.usc_sn}','${detail.tax_sn}','${detail.register_sn}','${detail.org_sn}','${detail.legeal_name}','${detail.reg_captial}','${detail.manage_status}','${detail.register_date}','${detail.company_type}','${detail.personnel_scale}','${detail.expired_date}','${detail.register_org}','${detail.verify_date}','${detail.english_name.replace(/'/g,'')}','${detail.company_area}','${detail.company_industry}','${detail.old_name}','${detail.company_address}','${detail.business_scope.replace(/'/g,'')}')`;
     return sql + value;
 }
 

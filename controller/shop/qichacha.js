@@ -25,7 +25,7 @@ let publicProxy = [];
 const PROXY_TBL_NAME = 'proxy_list_taobao';
 
 // 10进程并发取数
-const THREAD_NUM = 100;
+const THREAD_NUM = 9;
 
 async function init() {
   // 获取并存储省份数据 await getProvinceIndex(); 从数据库中读取省份数据 let provinces = await
@@ -48,7 +48,7 @@ function getRndInt(){
 }
 
 async function getProxyListFromDb(CUR_THREAD_IDX){
-  let sql = `select a.id,a.host,a.port,a.status from (select @rownum:=@rownum+1 as rownum, b.* from (select @rownum:=0) a,${PROXY_TBL_NAME} b where b.id>5000) a where (a.rownum)%${THREAD_NUM} = ${CUR_THREAD_IDX}`;
+  let sql = `select a.id,a.host,a.port,a.status from (select @rownum:=@rownum+1 as rownum, b.* from (select @rownum:=0) a,${PROXY_TBL_NAME} b) a where a.status>-1 and (a.rownum)%${THREAD_NUM} = ${CUR_THREAD_IDX} order by id desc`;
   // `select * from ${PROXY_TBL_NAME} where status = 0 and (id+${THREAD_NUM})%${THREAD_NUM} = ${CUR_THREAD_IDX}`
 
   proxyList[CUR_THREAD_IDX] = await query(sql);
@@ -103,7 +103,6 @@ async function getCompanyFromDb(CUR_THREAD_IDX) {
 async function recordProxyInfo(proxy) {
   let sql = `update ${PROXY_TBL_NAME} set status = ${proxy.status} where id=${proxy.id} and status=0`;
   query(sql);
-  console.log('sql executed finish');
 }
 
 async function saveHtml2Disk(content, data) {
@@ -114,7 +113,7 @@ async function saveHtml2Disk(content, data) {
 // 获取代理配置 '222.196.33.254':3128 可用 '122.72.32.82:80 122.72.32.84 122.72.32.83
 function getProxy(i,CUR_THREAD_IDX) {
   // return {   host: '222.196.33.254',   port: 3128 }
-  console.log('正在使用代理' + i + '获取数据:\n');
+  console.log('\n正在使用代理' + i + '获取数据:');
   publicProxy[CUR_THREAD_IDX] = proxyList[CUR_THREAD_IDX][i];
   return publicProxy[CUR_THREAD_IDX];
 }
@@ -132,7 +131,7 @@ async function getCompanyDetail(company,CUR_THREAD_IDX) {
     //     ') Chrome/60.0.3112.113 Safari/537.36',
     Refer:'http://www.qichacha.com/index_verify?type=companyview&back=/firm'+url.split('firm')[1],
     'User-Agent':'Mozilla/5.0 (Linux; Android 5.1.1; Nexus 6 Build/LYZ28E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Mobile Safari/537.36',
-    timeout: 5000,
+    timeout: 10000,
    // 'Cookie':'acw_tc=AQAAANK84EdEagsAwhfU3tVQtsdsqnlR; PHPSESSID=hi2dsvv84kmojhtugturjjdlj1; zg_did=%7B%22did%22%3A%20%2215e648af99fc2c-006ccf8c873ac6-7b4a457d-49a10-15e648af9a08bf%22%7D; zg_de1d1a35bfa24ce29bbf2c7eb17e6c4f=%7B%22sid%22%3A%201504925383074%2C%22updated%22%3A%201504925383077%2C%22info%22%3A%201504925383076%2C%22superProperty%22%3A%20%22%7B%7D%22%2C%22platform%22%3A%20%22%7B%7D%22%2C%22utm%22%3A%20%22%7B%7D%22%2C%22referrerDomain%22%3A%20%22www.qichacha.com%22%7D; UM_distinctid=15e648afa754ae-068cfefc5ae691-7b4a457d-49a10-15e648afa76a30; CNZZDATA1254842228=97650014-1504923112-null%7C1504923112; _uab_collina=150492538335327593229124'
   };
   console.log('线程'+CUR_THREAD_IDX,option.proxy);
@@ -148,7 +147,7 @@ async function getCompanyDetail(company,CUR_THREAD_IDX) {
       console.log(e.message);
       return '';
     });
-  console.log('线程'+CUR_THREAD_IDX+'数据获取完毕');
+    
   if (html == '') {
     publicProxy[CUR_THREAD_IDX].status = -1;
     await recordProxyInfo(publicProxy[CUR_THREAD_IDX]);
