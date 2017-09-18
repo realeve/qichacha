@@ -1,6 +1,6 @@
 // http://www.httpdaili.com/api.asp?ddbh=57729626221522367&old=&noinfo=true&sl=100
 
-a = '121.238.129.4:8998 42.54.99.82:8998 123.57.38.208:80'
+a = ''
 b = a.split(' ')
 c = b.map(item => {
   let port = item.split(':')[1],

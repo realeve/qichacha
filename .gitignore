@@ -48,16 +48,5 @@ Network Trash Folder
 Temporary Items
 .apdisk
 node_modules
-test
-doc
-
-# 交易记录
-cncoinRecord
-
-# 邮箱设置
-mailAuth.js
-
-# JD Cookie
-jdCookie
 
 /controller/data
