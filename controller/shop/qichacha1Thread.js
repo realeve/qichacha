@@ -1,5 +1,5 @@
 /**
- * 获取企查查数据并存储
+ * 本机单IP获取企查查数据并存储
  */
 
 let querystring = require('querystring');
@@ -14,26 +14,20 @@ let settings = require('../util/urlList.js');
 let sqlParser = require('../util/sqlParser');
 let fs = require('fs');
 
-// let proxyList = require('../util/proxyList');
-
-let proxyList = [];
-let proxyIdx = 1;
-let publicProxy = {};
-
-// 10进程并发取数
-const THREAD_NUM = 10;
+// 是否需要存储相应Html文件至本地
+let SAVE_HTML_FILES = false;
 
 async function init() {
-  // 获取并存储省份数据 await getProvinceIndex(); 从数据库中读取省份数据 let provinces = await
-  // getPorvFromDb(); 获取各省公司列表 await getCompanyByProvince(provinces);
-  // 从数据库中获取待处理详情的公司列表
-  await getProxyListFromDb();
-
+  /* 
+  // step1：获取并存储省份数据
+  await getProvinceIndex();
+  // step2：从数据库中读取省份数据,然后获取各省公司列表
+  let provinces = await getPorvFromDb();
+  await getCompanyByProvince(provinces);
+ */
+ 
+ // step3: 从数据库中获取待处理详情的公司列表
   await getCompanyFromDb();
-}
-
-async function getProxyListFromDb() {
-  proxyList = await query('select * from proxyList where status <>-1');
 }
 
 function getCompanySqlByPage(page) {
@@ -92,14 +86,6 @@ async function saveHtml2Disk(content, data) {
   fs.writeFileSync(fileName, data, 'utf8');
 }
 
-// 获取代理配置 '222.196.33.254':3128 可用 '122.72.32.82:80 122.72.32.84 122.72.32.83
-function getProxy(i) {
-  // return {   host: '222.196.33.254',   port: 3128 }
-  console.log('正在使用代理' + i + '获取数据:\n');
-  publicProxy = proxyList[i];
-  return publicProxy;
-}
-
 // 抓取公司详情
 async function getCompanyDetail(company) {
   let url = company.href;
@@ -108,13 +94,12 @@ async function getCompanyDetail(company) {
     method: 'get',
     url,
     responseType: 'text',
-    // proxy: getProxy(proxyIdx),
-    Refer: 'http://www.qichacha.com/index_verify?type=companyview&back=/firm' + url.split('firm')[1],
+    // Refer: 'http://www.qichacha.com/index_verify?type=companyview&back=/firm' +
+    // url.split('firm')[1],
     'User-Agent': 'Mozilla/5.0 (Linux; Android 5.1.1; Nexus 6 Build/LYZ28E) AppleWebKit/537.36 (KHT' +
         'ML, like Gecko) Chrome/60.0.3112.113 Mobile Safari/537.36',
     timeout: 3000
   };
-  // console.log(option.proxy); 2s以内代理连接失效，自动转换
 
   let html = await axios(option)
     .then(res => res.data)
@@ -123,25 +108,26 @@ async function getCompanyDetail(company) {
       console.log(e.message);
       return '';
     });
- // console.log('数据获取完毕');
+  // console.log('数据获取完毕');
   if (html == '') {
     console.log(html);
-    // publicProxy.status = -1; await recordProxyInfo(publicProxy);
     return false;
   } else if (html.slice(0, 8) == '<script>') {
     console.log(html);
-    // publicProxy.status = 2; await recordProxyInfo(publicProxy);
     return false;
   }
 
-  // let filename = url.replace('http://www.qichacha.com/', '');
-  // saveHtml2Disk(filename, html); console.log('存储至本地硬盘');
+  if (SAVE_HTML_FILES) {
+    let filename = url.replace('http://www.qichacha.com/', '');
+    saveHtml2Disk(filename, html);
+    console.log('存储至本地硬盘');
+  }
 
   let result = await handleCompanyDetail(html, company.id).catch(e => {
     console.log(e.message);
     return false;
   }).then(res => true);
- // console.log('处理非结构化数据完毕');
+  console.log('处理非结构化数据完毕');
   return result;
 }
 

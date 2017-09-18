@@ -24,14 +24,19 @@ let publicProxy = [];
 // const PROXY_TBL_NAME =  'proxyList'; 
 const PROXY_TBL_NAME = 'proxy_list_taobao';
 
-// 10进程并发取数
-const THREAD_NUM = 9;
+// 100进程并发取数
+const THREAD_NUM = 100;
 
 async function init() {
-  // 获取并存储省份数据 await getProvinceIndex(); 从数据库中读取省份数据 let provinces = await
-  // getPorvFromDb(); 获取各省公司列表 await getCompanyByProvince(provinces);
-  
-  // 从数据库中获取待处理详情的公司列表
+  /* 
+  // step1：获取并存储省份数据
+  await getProvinceIndex();
+  // step2：从数据库中读取省份数据,然后获取各省公司列表
+  let provinces = await getPorvFromDb();
+  await getCompanyByProvince(provinces);
+ */
+ 
+ // step3:从数据库中获取待处理详情的公司列表
   for(let i=0;i<=THREAD_NUM;i++){
     proxyIdx.push(1);
     publicProxy.push({});
