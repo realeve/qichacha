@@ -1,5 +1,4 @@
 let cheerio = require('cheerio');
-let POSTAG = require('segment').POSTAG;
 let mail = require('./sendmail');
 
 let http = require('https');
@@ -137,40 +136,6 @@ function parseHTML(options) {
         data.push(nodeData);
     });
     return data;
-}
-
-function handleWordSegment(wordList) {
-    let words = wordList.map(item => {
-        return {
-            ps: POSTAG.chsName(item.p).split(' ')[0],
-            w: item.w
-        };
-    });
-
-    let comment = [];
-    if (words[0].ps.includes('形容词')) {
-        comment.push(words[0].w);
-    }
-
-    for (var i = 1; i < words.length; i++) {
-        var item = words[i];
-        if (item.ps.includes('形容词')) {
-            if (words[i - 1].ps.includes('副词')) {
-                comment.push(words[i - 1].w + item.w);
-            } else {
-                comment.push(item.w);
-            }
-        } else if (item.ps.includes('名词') || item.ps.includes('动词')) {
-            if (item.w.length > 1) {
-                comment.push(item.w);
-            }
-        }
-
-    }
-    return {
-        comment,
-        words
-    };
 }
 
 // 程序主目录

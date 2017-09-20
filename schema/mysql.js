@@ -25,7 +25,7 @@ async function query(sql, data, callback) {
     }
     return new Promise((resolve, reject) => {
         pool.getConnection((err, conn) => {
-            
+
             // 此处应该会由conn.query自动判断data的属性从而决定parse还是callback
             conn.query(sql, data, (err, result) => {
                 errorHandle(err, sql);
@@ -39,6 +39,7 @@ async function query(sql, data, callback) {
                     resolve(result);
                 } catch (e) {
                     console.log(e);
+                    console.log(sql);
                     mail.send({
                         subject: '数据库读写异常',
                         html: `${util.getNow()},errorInfo:<br>${e.message}<br> ${JSON.stringify(e)}<br>sql:${sql} `
