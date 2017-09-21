@@ -29,8 +29,9 @@ const THREAD_NUM = 25;
 
 async function init() {
 
-    // await addZhimaProxy(); await addProxy();
-    await startTask();
+    await addZhimaProxy(); 
+    /*await addProxy();
+    await startTask();*/
 }
 
 async function startTask() {
@@ -60,6 +61,7 @@ async function addZhimaProxy() {
             break;
         }
         console.log(`第${i}/${MONEY_PAYED_FOR}代理列表插入完毕`);
+        await(util.sleep(2100));
     }
 }
 
