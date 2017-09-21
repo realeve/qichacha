@@ -13,4 +13,4 @@ c = b.map(item => {
 })
 d = c.map(item => `('${item.host}','${item.port}',${item.status})`);
 
-console.log('insert into proxy_list_taobao(host,port,status) values ' + d.join(','));
+console.log('insert into proxy_list_taobao(ip,port,status) values ' + d.join(','));

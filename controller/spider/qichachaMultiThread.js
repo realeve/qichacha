@@ -44,7 +44,7 @@ async function init() {
         setTimeout(() => {
             startTask();
         }, 5000)
-    }, 90 * 1000);
+    }, 120 * 1000);
 
 }
 
@@ -56,6 +56,7 @@ async function startTask() {
         let CUR_THREAD_IDX = i;
         getCompanyFromDb(CUR_THREAD_IDX);
     }
+    await recordProxy();
 }
 
 // 获取淘宝高质量IP列表
@@ -76,7 +77,15 @@ async function refreshProxy() {
                         host = item.split(':')[0];
                     return {host, port}
                 })
+
         });
+}
+
+async function recordProxy() {
+    let rec_time = util.getNow();
+    let str = proxyList.map(item => `('${item.host}','${item.port}','${rec_time}')`);
+    let sql = 'insert into proxy_list(ip,port,rec_time) values';
+    await query(sql + str.join(','));
 }
 
 function getTaskList(page) {
@@ -107,11 +116,8 @@ async function getCompanyFromDb(CUR_THREAD_IDX) {
             if (!havedata) {
                 console.log('数据抓取失败，将启用下一个代理结点。')
                 TRY_TIMES++;
-                // 试错100次时重置
-                if (TRY_TIMES >= THREAD_NUM * 5) {
-                    // util.sleep(1000);
-                    await refreshProxy();
-                }
+                // 试错100次时重置 if (TRY_TIMES >= THREAD_NUM * 5) {     // util.sleep(1000); await
+                // refreshProxy(); }
             } else {
                 console.log(`第${j + 1}/${companys.length}条数据采集完毕`);
                 j++;
@@ -144,7 +150,7 @@ async function getCompanyDetail(company, CUR_THREAD_IDX) {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)' +
                     ' Chrome/60.0.3112.113 Safari/537.36'
         },
-        timeout: 5000
+        timeout: 30 *1000
     };
 
     console.log('线程' + CUR_THREAD_IDX, option.proxy);
@@ -182,12 +188,18 @@ async function getCompanyDetail(company, CUR_THREAD_IDX) {
         console.log('存储至本地硬盘');
     }
 
-    let result = await handleCompanyDetail(html, url).catch(e => {
-        console.log(e.message);
+    let result = await handleCompanyDetail(html, url).catch(async e => {
+        console.log(url);
+        await recordFailedInfo(url);
         return false;
     }).then(res => true);
     console.log('线程' + CUR_THREAD_IDX + '处理非结构化数据');
     return result;
+}
+
+async function recordFailedInfo(url) {
+    let sql = `update task_list set status=-1 where href = '${url}'`;
+    await query(sql);
 }
 
 async function handleCompanyDetail(html, href) {

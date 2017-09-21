@@ -108,7 +108,9 @@ async function getCompanyDetail(company) {
         console.log('存储至本地硬盘');
     }
 
-    let result = await handleCompanyDetail(html, url).catch(e => {
+    let result = await handleCompanyDetail(html, url).catch(async e => {
+        console.log(url);
+        await recordFailedInfo(url);
         console.log(e.message);
         return false;
     }).then(res => true);
@@ -116,13 +118,24 @@ async function getCompanyDetail(company) {
     return result;
 }
 
+async function recordFailedInfo(href){
+    let url = href.replace('http://www.qichacha.com', '').replace('.html', '');
+    let sql = `update task_list set status=-1 where href = '${url}'`;
+    await query(sql);
+}
+
 async function handleCompanyDetail(html, href) {
+
+    let url = href.replace('http://www.qichacha.com', '').replace('.html', '');
 
     let companyDetail = parser.companyDetail2(html);
     companyDetail.href = href;
 
     let sql = sqlParser.companyDetail2(companyDetail);
-    await query(sql);
+    await query(sql)
+    // .catch(async e=>{        
+    //     await recordFailedInfo(url);
+    // })
 
     let favorite = parser.favoriteInfo(html);
     sql = 'insert into task_list(company_name,href,status) values ';
@@ -130,7 +143,6 @@ async function handleCompanyDetail(html, href) {
     sql = sql + str.join(',');
     await query(sql);
 
-    let url = href.replace('http://www.qichacha.com', '').replace('.html', '');
     sql = `update task_list set status=1 where href = '${url}'`;
     await query(sql);
 }

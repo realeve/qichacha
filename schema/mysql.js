@@ -7,10 +7,10 @@ let util = require('../controller/util/common');
 let pool = mysql.createPool(config)
 let errorHandle = (errInfo, sql = 'none') => {
     if (errInfo) {
-        mail.send({
-            subject: '数据库读写异常',
-            html: `${util.getNow()},errorInfo:<br>${errInfo}`
-        });
+        // mail.send({
+        //     subject: '数据库读写异常',
+        //     html: `${util.getNow()},errorInfo:<br>${errInfo}`
+        // });
         logger.error('Error occured.', {
             time: new Date().toLocaleString(),
             sql,
@@ -40,10 +40,11 @@ async function query(sql, data, callback) {
                 } catch (e) {
                     console.log(e);
                     console.log(sql);
-                    mail.send({
-                        subject: '数据库读写异常',
-                        html: `${util.getNow()},errorInfo:<br>${e.message}<br> ${JSON.stringify(e)}<br>sql:${sql} `
-                    });
+                    reject(result);
+                    // mail.send({
+                    //     subject: '数据库读写异常',
+                    //     html: `${util.getNow()},errorInfo:<br>${e.message}<br> ${JSON.stringify(e)}<br>sql:${sql} `
+                    // });
                 }
             });
         });
