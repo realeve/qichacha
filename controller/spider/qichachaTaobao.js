@@ -23,15 +23,15 @@ let SAVE_HTML_FILES = false;
 
 // 代理列表表单名，区分淘宝购买与免费爬取的列表
 let PROXY_TBL_NAME = 'proxy_list_taobao';
-PROXY_TBL_NAME = 'proxy_list_zhima';
+// PROXY_TBL_NAME = 'proxy_list_zhima';
 
 const THREAD_NUM = 25;
 
 async function init() {
 
-    await addZhimaProxy(); 
-    /*await addProxy();
-    await startTask();*/
+    // await addZhimaProxy(); 
+    // await addProxy();
+    // await startTask();
 }
 
 async function startTask() {
