@@ -20,7 +20,7 @@ let SAVE_HTML_FILES = false;
 let proxyList = [];
 
 // 20组独立IP双开
-const IPNUMS = 2;
+const IPNUMS = 25;
 
 // 每组IP开3个链接
 const LINK_PER_THREAD = 1;
@@ -33,30 +33,48 @@ let proxyFlag = [];
 // 每个链接独立启线程
 
 async function init() {
-    startTask(); 
+    startTask();
 }
 
 async function startTask() {
-    
+    await refreshAllProxy();
     for (let i = 0; i < THREAD_NUM; i++) {
-        let CUR_THREAD_IDX = i;
-        // 刷新代理信息
-        await refreshProxy(CUR_THREAD_IDX);
-        await recordProxy(CUR_THREAD_IDX);
-        getCompanyFromDb(CUR_THREAD_IDX);
+        getCompanyFromDb(i);
     }
+}
+
+async function refreshAllProxy() {
+    let url = `http://http-webapi.zhimaruanjian.com/getip?num=${THREAD_NUM}&type=2&pro=&city=0&yys=0&port=1&time=1&ts=0&ys=0&cs=0&lb=1&sb=0&pb=4&mr=1`;
+    let html = await axios
+        .get(url)
+        .then(res => JSON.parse(res.data));
+
+    if (!html.success) {
+        return false;
+    }
+
+    proxyList = html
+        .data
+        .map(item => {
+            return {host: item.ip, port: item.port, status: true}
+        })
+    let strs = proxyList.map(item => ` ('${item.host}', '${item.port}', 0)`);
+    let sql = 'insert into proxy_list_zhima(ip,port,status) values';
+    await query(sql + strs.join(','));
 }
 
 // 获取高质量IP列表
 async function refreshProxy(CUR_THREAD_IDX) {
     // 等2秒
-    await util.sleep(2100);
-    
+    await util.sleep(1000);
     // 标志位置为0
     proxyFlag[CUR_THREAD_IDX] = 0;
 
-    //let url = `http://http-webapi.zhimaruanjian.com/getip?num=1&type=2&pro=0&city=0&yys=0&port=1&pack=1354&ts=0&ys=0&cs=0&lb=0&sb=0&pb=4&mr=0`;
-    let url = 'http://http-webapi.zhimaruanjian.com/getip?num=1&type=2&pro=&city=0&yys=0&port=1&time=1&ts=0&ys=0&cs=0&lb=1&sb=0&pb=4&mr=1';
+    // let url =
+    // `http://http-webapi.zhimaruanjian.com/getip?num=1&type=2&pro=0&city=0&yys=0&p
+    // o rt=1&pack=1354&ts=0&ys=0&cs=0&lb=0&sb=0&pb=4&mr=0`;
+    let url = 'http://http-webapi.zhimaruanjian.com/getip?num=1&type=2&pro=&city=0&yys=0&port=1' +
+            '&time=1&ts=0&ys=0&cs=0&lb=1&sb=0&pb=4&mr=1';
     let html = await axios
         .get(url)
         .then(res => JSON.parse(res.data));
@@ -72,10 +90,11 @@ async function refreshProxy(CUR_THREAD_IDX) {
         })
     // 更新对应代理的信息
     proxyList[CUR_THREAD_IDX] = arr[0];
+    await recordProxy(CUR_THREAD_IDX);
 }
 
 async function recordProxy(CUR_THREAD_IDX) {
-    
+
     let item = proxyList[CUR_THREAD_IDX];
     let str = ` ('${item.host}', '${item.port}', 0)`;
     let sql = 'insert into proxy_list_zhima(ip,port,status) values';
@@ -85,15 +104,13 @@ async function recordProxy(CUR_THREAD_IDX) {
 function getTaskList(page) {
 
     return ` SELECT id,
-        concat('http://www.qichacha.com', href, '.html')href FROM task_list where status = 0 limit ${
-            (page - 1) * 100
-        },
+        concat('http://www.qichacha.com', href, '.html')href FROM task_list where status = 0 limit ${ (page - 1) * 100},
         100 `;
 }
 
 function getTaskListByPage(CUR_THREAD_IDX, page) {
     // 多线程，将id取余则可多个线程同时取数
-    return ` select * from(select @rownum := @rownum + 1 rownum, a. * from(SELECT distinct concat('http://www.qichacha.com', href, '.html')href FROM(select @rownum := 0)a, task_list b where b.status = 0)a)a where a.rownum % ${THREAD_NUM} = ${CUR_THREAD_IDX}   limit ${(page - 1) * 100},100 `;
+    return ` select * from(select @rownum := @rownum + 1 rownum, a. * from(SELECT distinct concat('http://www.qichacha.com', href, '.html')href FROM(select @rownum := 0)a, task_list b where b.status = 0)a)a where a.rownum % ${THREAD_NUM} = ${CUR_THREAD_IDX}   limit ${ (page - 1) * 100},100 `;
 }
 
 // 从数据库中获取公司列表；
@@ -112,21 +129,18 @@ async function getCompanyFromDb(CUR_THREAD_IDX) {
             // 如果数据加载失败，切换代理，继续抓取
             if (!havedata) {
                 console.log('数据抓取失败，重试本代理。');
-                
+
                 // 状态记录增加
                 proxyFlag[CUR_THREAD_IDX]++;
-                
-                // 等待1S
-                await util.sleep(1000);
 
                 // 连续5次错误，重新读取代理信息
                 if (proxyFlag[CUR_THREAD_IDX] >= 5) {
                     proxyFlag[CUR_THREAD_IDX] = 0;
                     console.log('线程' + CUR_THREAD_IDX + ':代理信息使用完毕,重新获取。')
                     await refreshProxy(CUR_THREAD_IDX);
-                }                
+                }
             } else {
-                console.log(` 第${j + 1} / ${companys.length}条数据采集完毕 `);
+                console.log(` 第${j + 1} / ${companys.length}条数据采集完毕${util.getNow()}`);
                 j++;
             }
         }
@@ -200,7 +214,7 @@ async function getCompanyDetail(company, CUR_THREAD_IDX) {
         await recordFailedInfo(url);
         return false;
     }).then(res => true);
-    console.log('线程' + CUR_THREAD_IDX + '处理非结构化数据');
+    
     return result;
 }
 
