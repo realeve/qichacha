@@ -21,16 +21,16 @@ let publicProxy = [];
 // 是否需要存储相应Html文件至本地
 let SAVE_HTML_FILES = false;
 
-// 代理列表表单名，区分淘宝购买与免费爬取的列表 const PROXY_TBL_NAME =  'proxyList';
-const PROXY_TBL_NAME = 'proxy_list_taobao';
+// 代理列表表单名，区分淘宝购买与免费爬取的列表
+let PROXY_TBL_NAME = 'proxy_list_taobao';
+PROXY_TBL_NAME = 'proxy_list_zhima';
 
-// 100进程并发取数
-const THREAD_NUM = 100;
+const THREAD_NUM = 25;
 
 async function init() {
 
-    await addProxy();
-    // await startTask();
+    // await addZhimaProxy(); await addProxy();
+    await startTask();
 }
 
 async function startTask() {
@@ -44,17 +44,55 @@ async function startTask() {
         await getProxyListFromDb(CUR_THREAD_IDX);
         getCompanyFromDb(CUR_THREAD_IDX);
     }
+    console.log('所有信息采集完毕');
+}
+
+// 获取芝麻代理
+async function addZhimaProxy() {
+    let MONEY_PAYED_FOR = 50;
+    for (let i = 0; i < MONEY_PAYED_FOR; i++) {
+        let success = await addZhimaProxy2DB().catch(e => {
+            console.log(e.message);
+            break;
+        });
+        if (!success) {
+            console.log(`第${i}/${MONEY_PAYED_FOR}代理列表获取失败，停止获取`);
+            break;
+        }
+        console.log(`第${i}/${MONEY_PAYED_FOR}代理列表插入完毕`);
+    }
+}
+
+async function addZhimaProxy2DB() {
+    let url = 'http://http-webapi.zhimaruanjian.com/getip?num=25&type=2&pro=0&city=0&yys=0&port' +
+            '=1&pack=1354&ts=0&ys=0&cs=0&lb=0&sb=0&pb=4&mr=0';
+    let html = await axios
+        .get(url)
+        .then(res => JSON.parse(res.data));
+
+    if (!html.success) {
+        return false;
+    }
+    let strs = html
+        .data
+        .map(item => `('${item.ip}','${item.port}',0)`);
+    if (strs.length) {
+        let sql = 'insert into proxy_list_zhima(ip,port,status) values ' + strs.join(',');
+        await query(sql);
+        console.log('本次共写入' + strs.length + '条数据');
+    }
+    return strs.length > 0;
 }
 
 // 添加购买的IP
 async function addProxy() {
     let MONEY_PAYED_FOR = 50;
     for (let i = 0; i < MONEY_PAYED_FOR; i++) {
-       let success = await addProxyInfo().catch(e => {
+        let success = await addProxyInfo().catch(e => {
             console.log(e.message);
             break;
         });
-        if(!success){
+        if (!success) {
             break;
         }
         console.log(`第${i}/${MONEY_PAYED_FOR}代理列表插入完毕`);
@@ -82,11 +120,11 @@ async function addProxyInfo() {
         await query(sql);
         console.log('本次共写入' + (arr.length - 1) + '条数据');
     }
-    return strs.length>0;
+    return strs.length > 0;
 }
 
 async function getProxyListFromDb(CUR_THREAD_IDX) {
-    let sql = `select a.id,a.ip host,a.port,a.status from (select @rownum:=@rownum+1 as rownum, b.* from (select @rownum:=0) a,${PROXY_TBL_NAME} b) a where a.status>-1 and (a.rownum)%${THREAD_NUM} = ${CUR_THREAD_IDX} order by id desc`;
+    let sql = `select a.rownum id,a.ip host,a.port,a.status from (select @rownum:=@rownum+1 as rownum, b.* from (select @rownum:=0) a,${PROXY_TBL_NAME} b where b.status= 0 ) a where (a.rownum)%${THREAD_NUM} = ${CUR_THREAD_IDX} order by id desc`;
 
     proxyList[CUR_THREAD_IDX] = await query(sql);
 }
@@ -113,9 +151,10 @@ async function getCompanyFromDb(CUR_THREAD_IDX) {
             // 如果数据加载失败，切换代理，继续抓取
             if (!havedata) {
                 proxyIdx[CUR_THREAD_IDX]++;
-                if (proxyIdx[CUR_THREAD_IDX] == proxyList[CUR_THREAD_IDX].length - 1) {
+                if (proxyIdx[CUR_THREAD_IDX] >= proxyList[CUR_THREAD_IDX].length - 1) {
                     isFinished = true;
                     j = companys.length;
+                    console.log('线程' + CUR_THREAD_IDX + ':代理信息使用完毕。')
                     break;
                 }
                 console.log('数据抓取失败，将启用下一个代理结点。')
@@ -142,7 +181,7 @@ async function saveHtml2Disk(content, data) {
 
 function getProxy(i, CUR_THREAD_IDX) {
     console.log('\n正在使用代理' + i + '获取数据:');
-    publicProxy[CUR_THREAD_IDX] = proxyList[CUR_THREAD_IDX][i];
+    publicProxy[CUR_THREAD_IDX] = proxyList[CUR_THREAD_IDX][i-1];
     return publicProxy[CUR_THREAD_IDX];
 }
 
@@ -162,7 +201,7 @@ async function getCompanyDetail(company, CUR_THREAD_IDX) {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)' +
                     ' Chrome/60.0.3112.113 Safari/537.36'
         },
-        timeout: 10000
+        // timeout: 10000
     };
     console.log('线程' + CUR_THREAD_IDX, option.proxy);
     // 2s以内代理连接失效，自动转换
