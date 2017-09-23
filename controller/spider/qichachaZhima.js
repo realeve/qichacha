@@ -20,30 +20,36 @@ let SAVE_HTML_FILES = false;
 let proxyList = [];
 
 // 20组独立IP双开
-const IPNUMS = 25;
+let IPNUMS = 50;
 
 // 每组IP开3个链接
 const LINK_PER_THREAD = 1;
 
 //总并发
-const THREAD_NUM = LINK_PER_THREAD * IPNUMS;
+let THREAD_NUM = LINK_PER_THREAD * IPNUMS;
 
 let proxyFlag = [];
 
 // 每个链接独立启线程
 
-async function init() {
-    startTask();
+async function init(start = 0, end = 10) {
+    IPNUMS = end - start;
+    THREAD_NUM = LINK_PER_THREAD * IPNUMS;
+
+    startTask(start, end);
 }
 
-async function startTask() {
-    await refreshAllProxy();
-    for (let i = 0; i < THREAD_NUM; i++) {
+async function startTask(start, end) {
+    await refreshAllProxy(start, end);
+    for (let i = start; i < end; i++) {
+        proxyFlag[i] = 0;
+    }
+    for (let i = start; i < end; i++) {
         getCompanyFromDb(i);
     }
 }
 
-async function refreshAllProxy() {
+async function refreshAllProxy(start, end) {
     let url = `http://http-webapi.zhimaruanjian.com/getip?num=${THREAD_NUM}&type=2&pro=&city=0&yys=0&port=1&time=1&ts=0&ys=0&cs=0&lb=1&sb=0&pb=4&mr=1`;
     let html = await axios
         .get(url)
@@ -53,11 +59,14 @@ async function refreshAllProxy() {
         return false;
     }
 
-    proxyList = html
+    let arr = html
         .data
         .map(item => {
             return {host: item.ip, port: item.port, status: true}
         })
+    for (let i = start; i < end; i++) {
+        proxyList[i] = arr[i - start];
+    }
     let strs = proxyList.map(item => ` ('${item.host}', '${item.port}', 0)`);
     let sql = 'insert into proxy_list_zhima(ip,port,status) values';
     await query(sql + strs.join(','));
@@ -66,7 +75,7 @@ async function refreshAllProxy() {
 // 获取高质量IP列表
 async function refreshProxy(CUR_THREAD_IDX) {
     // 等2秒
-    await util.sleep(1000);
+    await util.sleep(2100);
     // 标志位置为0
     proxyFlag[CUR_THREAD_IDX] = 0;
 
@@ -109,8 +118,13 @@ function getTaskList(page) {
 }
 
 function getTaskListByPage(CUR_THREAD_IDX, page) {
-    // 多线程，将id取余则可多个线程同时取数
-    return ` select * from(select @rownum := @rownum + 1 rownum, a. * from(SELECT distinct concat('http://www.qichacha.com', href, '.html')href FROM(select @rownum := 0)a, task_list b where b.status = 0)a)a where a.rownum % ${THREAD_NUM} = ${CUR_THREAD_IDX}   limit ${ (page - 1) * 100},100 `;
+    // 多线程，将id取余则可多个线程同时取数,确保所有数据有线程处理 return ` select * from(select @rownum :=
+    // @rownum + 1 rownum, a. * from(SELECT distinct
+    // concat('http://www.qichacha.com', href, '.html')href FROM(select @rownum :=
+    // 0)a, task_list b where b.status = 0)a)a where a.rownum % ${THREAD_NUM} =
+    // ${CUR_THREAD_IDX}   limit ${ (page - 1) * 100},100 `;
+
+    return `SELECT distinct concat('http://www.qichacha.com', href, '.html') href FROM task_list b where b.status = 0 and b.id % ${THREAD_NUM} = ${CUR_THREAD_IDX} limit ${ (page - 1) * 100},100 `;
 }
 
 // 从数据库中获取公司列表；
@@ -158,7 +172,6 @@ async function getCompanyDetail(company, CUR_THREAD_IDX) {
 
     let PROXINDEX = CUR_THREAD_IDX % IPNUMS;
 
-    console.log('正在使用代理' + CUR_THREAD_IDX + '获取数据:\n');
     let option = {
         method: 'get',
         url,
@@ -214,7 +227,7 @@ async function getCompanyDetail(company, CUR_THREAD_IDX) {
         await recordFailedInfo(url);
         return false;
     }).then(res => true);
-    
+
     return result;
 }
 
