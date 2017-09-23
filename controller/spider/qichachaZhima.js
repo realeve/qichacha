@@ -20,22 +20,22 @@ let SAVE_HTML_FILES = false;
 let proxyList = [];
 
 // 20组独立IP双开
-let IPNUMS = 50;
+// let IPNUMS = 50;
 
 // 每组IP开3个链接
 const LINK_PER_THREAD = 1;
 
 //总并发
-let THREAD_NUM = LINK_PER_THREAD * IPNUMS;
+let THREAD_NUM = LINK_PER_THREAD;
 
 let proxyFlag = [];
 
 // 每个链接独立启线程
-
+let STARTID = 0;
 async function init(start = 0, end = 10) {
-    IPNUMS = end - start;
-    THREAD_NUM = LINK_PER_THREAD * IPNUMS;
 
+    THREAD_NUM =  end - start;
+    STARTID = start;
     startTask(start, end);
 }
 
@@ -127,7 +127,7 @@ function getTaskListByPage(CUR_THREAD_IDX, page) {
     // 0)a, task_list b where b.status = 0)a)a where a.rownum % ${THREAD_NUM} =
     // ${CUR_THREAD_IDX}   limit ${ (page - 1) * 100},100 `;
 
-    return `SELECT distinct concat('http://www.qichacha.com', href, '.html') href FROM task_list b where b.status = 0 and b.id % ${THREAD_NUM} = ${CUR_THREAD_IDX} limit ${ (page - 1) * 100},100 `;
+    return `SELECT distinct concat('http://www.qichacha.com', href, '.html') href FROM task_list b where b.status = 0 and b.id % ${THREAD_NUM} = ${CUR_THREAD_IDX-STARTID} limit ${ (page - 1) * 100},100 `;
 }
 
 // 从数据库中获取公司列表；
@@ -136,7 +136,8 @@ async function getCompanyFromDb(CUR_THREAD_IDX) {
     // 按100页获取数据
     for (let i = 1; !isFinished; i++) {
         console.log(`线程${CUR_THREAD_IDX} 正在读取第${i}页数据，每页100条.`)
-        let companys = await query(getTaskListByPage(CUR_THREAD_IDX, i));
+        let sql = getTaskListByPage(CUR_THREAD_IDX, i);
+        let companys = await query(sql);
         if (companys.length < 100) {
             isFinished = true;
         }
@@ -173,7 +174,7 @@ async function saveHtml2Disk(content, data) {
 async function getCompanyDetail(company, CUR_THREAD_IDX) {
     let url = company.href;
 
-    let PROXINDEX = CUR_THREAD_IDX % IPNUMS;
+    let PROXINDEX = CUR_THREAD_IDX;
 
     let option = {
         method: 'get',
