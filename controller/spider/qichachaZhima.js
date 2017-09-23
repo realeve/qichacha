@@ -64,10 +64,13 @@ async function refreshAllProxy(start, end) {
         .map(item => {
             return {host: item.ip, port: item.port, status: true}
         })
+    let strs = [];
     for (let i = start; i < end; i++) {
-        proxyList[i] = arr[i - start];
+        let item = arr[i - start];
+        proxyList[i] = item;
+        strs.push(` ('${item.host}', '${item.port}', 0)`);
     }
-    let strs = proxyList.map(item => ` ('${item.host}', '${item.port}', 0)`);
+
     let sql = 'insert into proxy_list_zhima(ip,port,status) values';
     await query(sql + strs.join(','));
 }
