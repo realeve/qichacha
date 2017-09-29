@@ -56,7 +56,7 @@ async function getCompanyFromDb() {
 
             // 如果数据加载失败，切换代理，继续抓取
             if (!havedata) {
-                console.log('数据抓取失败，将启用下一个代理结点。')
+                console.log('数据抓取失败，继续重试。')
                 continue;
             } else {
                 console.log(`第${j + 1}/${companys.length}条数据采集完毕`);
@@ -79,8 +79,14 @@ async function getCompanyDetail(company) {
         method: 'get',
         url,
         responseType: 'text',
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 5.1.1; Nexus 6 Build/LYZ28E) AppleWebKit/537.36 (KHT' +
-            'ML, like Gecko) Chrome/60.0.3112.113 Mobile Safari/537.36',
+        headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;' +
+                    'q=0.8',
+            'Accept-Encoding': 'gzip, deflate, brgzip, deflate',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1',
+            'Host': 'www.qichacha.com',
+            // 'Upgrade-Insecure-Requests': '1'
+        },
         timeout: 3000
     };
 
@@ -111,7 +117,7 @@ async function getCompanyDetail(company) {
     let result = await handleCompanyDetail(html, url).catch(async e => {
         console.log(url);
         await recordFailedInfo(url);
-        console.log(e.message);
+        console.log(e);
         return false;
     }).then(res => true);
     console.log('处理非结构化数据完毕');

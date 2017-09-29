@@ -19,10 +19,7 @@ let SAVE_HTML_FILES = false;
 
 let proxyList = [];
 
-// 20组独立IP双开
-// let IPNUMS = 50;
-
-// 每组IP开3个链接
+// 20组独立IP双开 let IPNUMS = 50; 每组IP开3个链接
 const LINK_PER_THREAD = 1;
 
 //总并发
@@ -34,7 +31,7 @@ let proxyFlag = [];
 let STARTID = 0;
 async function init(start = 0, end = 10) {
 
-    THREAD_NUM =  end - start;
+    THREAD_NUM = end - start;
     STARTID = start;
     startTask(start, end);
 }
@@ -127,7 +124,7 @@ function getTaskListByPage(CUR_THREAD_IDX, page) {
     // 0)a, task_list b where b.status = 0)a)a where a.rownum % ${THREAD_NUM} =
     // ${CUR_THREAD_IDX}   limit ${ (page - 1) * 100},100 `;
 
-    return `SELECT distinct concat('http://www.qichacha.com', href, '.html') href FROM task_list b where b.status = 0 and b.id % ${THREAD_NUM} = ${CUR_THREAD_IDX-STARTID} limit ${ (page - 1) * 100},100 `;
+    return `SELECT distinct concat('http://www.qichacha.com', href, '.html') href FROM task_list b where b.status = 0 and b.id % ${THREAD_NUM} = ${CUR_THREAD_IDX - STARTID} limit ${ (page - 1) * 100},100 `;
 }
 
 // 从数据库中获取公司列表；
@@ -152,7 +149,7 @@ async function getCompanyFromDb(CUR_THREAD_IDX) {
                 proxyFlag[CUR_THREAD_IDX]++;
 
                 // 连续5次错误，重新读取代理信息
-                if (proxyFlag[CUR_THREAD_IDX] >= 5) {
+                if (proxyFlag[CUR_THREAD_IDX] >= 15) {
                     proxyFlag[CUR_THREAD_IDX] = 0;
                     console.log('线程' + CUR_THREAD_IDX + ':代理信息使用完毕,重新获取。')
                     await refreshProxy(CUR_THREAD_IDX);
@@ -184,9 +181,10 @@ async function getCompanyDetail(company, CUR_THREAD_IDX) {
         headers: {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;' +
                     'q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)' +
-                    ' Chrome/60.0.3112.113 Safari/537.36'
+            'Accept-Encoding': 'gzip, deflate, brgzip, deflate',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTM' +
+                    'L, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1',
+            'Host': 'www.qichacha.com'
         },
         timeout: 30 *1000
     };
@@ -229,6 +227,7 @@ async function getCompanyDetail(company, CUR_THREAD_IDX) {
     let result = await handleCompanyDetail(html, url).catch(async e => {
         console.log(url);
         await recordFailedInfo(url);
+        console.log(e);
         return false;
     }).then(res => true);
 

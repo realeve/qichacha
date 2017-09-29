@@ -10,9 +10,9 @@ let zhima = require('./spider/qichachaZhima');
 async function init() {
     console.log('系统初始化：数据库表单初始化，载入默认数据。此处哪项任务未完成则请自行取消注释信息.');
     
-    zhima.init(10,15);
+    // zhima.init(0,20);
 
-    // local.init();
+   local.init();
 
     // qichacha.init();
     
