@@ -212,22 +212,26 @@ async function updateLocateInfo() {
     updateLocateByPage(2);
     updateLocateByPage(3);
     updateLocateByPage(4);
-    batch();
+    // batch();
 }
 
 async function batch(){
-    let sql = `select city name,count(*) from (select name,concat(substring_index(name,'市',1),'市') city from reg_org where name like '%市%' )a group by city having count(*)>10 order by 2 desc`;
+    let sql = `select city name,count(*) from (select name,concat(substring_index(name,'县',1),'县') city from reg_org where name like '%县%' )a group by city having count(*)>1 order by 2 desc`;
+    //let sql = `select city name,count(*) from (select 地址,concat(substring_index(地址,'市',1),'市') city from view_company where 省份='' and 地址 like '%市%' )a group by city having count(*)>1 order by 2 desc`;
+
     let orgs = await query(sql);
     for (let i = 0; i < orgs.length; i++) {
         let address = await getProvinceInfo(orgs[i].name,4);
         let sql = `update company_detail set province='${address.province}',city='${address.city}' where register_org like '%${orgs[i].name}%' and province=''`;
+        //let sql = `update company_detail set province='${address.province}',city='${address.city}' where company_address like '%${orgs[i].name}%' and province=''`;
         await query(sql);
         console.log(`第${i}/${orgs.length}数据批量更新完毕,${sql}`);
     }
 }
 
 async function updateLocateByPage(page){
-    let sql = `select * from reg_org where  name not like '%市%' limit ${page*800+1} ,800`;
+    let pagenum = 300;
+    let sql = `select * from reg_org limit ${page*pagenum+1} ,${pagenum}`;
     let orgs = await query(sql);
     for (let i = 0; i < orgs.length; i++) {
         let address = await getProvinceInfo(orgs[i].name,page);
