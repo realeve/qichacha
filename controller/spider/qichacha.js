@@ -153,6 +153,40 @@ async function handleCompanyDetail(html, href) {
     await query(sql);
 }
 
+async function getProvinceInfo(address){
+    
+    let url = 'http://restapi.amap.com/v3/geocode/geo?key=576f26878e97ff52c64718a56a0ae72a&address=' + encodeURIComponent(address);
+
+    return await axios.get(url).then(res=>{
+        let data = JSON.parse(res.data);
+        if(data.status == '1' && data.count !='0'){
+            return {
+                province:data.geocodes[0].province,
+                city:data.geocodes[0].city
+            }
+        }else{
+            return {
+                province:'',
+                city:''
+            }
+        }
+    })
+}
+
+async function updateLocateInfo(){
+    let sql = 'select * from reg_org';
+    let orgs = await query(sql);
+    for(let i=0;i<orgs.length;i++){
+        let address = await getProvinceInfo(orgs[i].name);
+        let sql = `update company_detail set province='${address.province}',city='${address.city}' where register_org = '${orgs[i].name}'`;
+        await query(sql);
+        console.log(`第${i}/${orgs.length}数据更新完毕,${sql}`);
+    }
+}
+
+
+
 module.exports = {
-    init
+    init,
+    updateLocateInfo
 };
