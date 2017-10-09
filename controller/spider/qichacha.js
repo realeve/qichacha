@@ -18,7 +18,7 @@ let fs = require('fs');
 let SAVE_HTML_FILES = false;
 
 async function init() {
-    /* 
+    /*
   // step1：获取并存储省份数据
   await getProvinceIndex();
   // step2：从数据库中读取省份数据,然后获取各省公司列表
@@ -83,7 +83,8 @@ async function getCompanyDetail(company) {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;' +
                     'q=0.8',
             'Accept-Encoding': 'gzip, deflate, brgzip, deflate',
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTM' +
+                    'L, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1',
             'Host': 'www.qichacha.com',
             // 'Upgrade-Insecure-Requests': '1'
         },
@@ -124,24 +125,26 @@ async function getCompanyDetail(company) {
     return result;
 }
 
-async function recordFailedInfo(href){
-    let url = href.replace('http://www.qichacha.com', '').replace('.html', '');
+async function recordFailedInfo(href) {
+    let url = href
+        .replace('http://www.qichacha.com', '')
+        .replace('.html', '');
     let sql = `update task_list set status=-1 where href = '${url}'`;
     await query(sql);
 }
 
 async function handleCompanyDetail(html, href) {
 
-    let url = href.replace('http://www.qichacha.com', '').replace('.html', '');
+    let url = href
+        .replace('http://www.qichacha.com', '')
+        .replace('.html', '');
 
     let companyDetail = parser.companyDetail2(html);
     companyDetail.href = href;
 
     let sql = sqlParser.companyDetail2(companyDetail);
     await query(sql)
-    // .catch(async e=>{        
-    //     await recordFailedInfo(url);
-    // })
+    // .catch(async e=>{     await recordFailedInfo(url); })
 
     let favorite = parser.favoriteInfo(html);
     sql = 'insert into task_list(company_name,href,status) values ';
@@ -153,38 +156,86 @@ async function handleCompanyDetail(html, href) {
     await query(sql);
 }
 
-async function getProvinceInfo(address){
-    
-    let url = 'http://restapi.amap.com/v3/geocode/geo?key=576f26878e97ff52c64718a56a0ae72a&address=' + encodeURIComponent(address);
+async function getProvinceInfo(address,page) {
+    let keyList = ['f6c558f2312ed7aa60c31fffb560d277','0cc62c1638ebace2b5e00a3011c087d2','d965d2f7eead45aa037c2b7fbf476693','4d27bd093645997e1c867d59f81ddf3f','dc501de966cae14a38da30acf556cd3a']
 
-    return await axios.get(url).then(res=>{
-        let data = JSON.parse(res.data);
-        if(data.status == '1' && data.count !='0'){
-            return {
-                province:data.geocodes[0].province,
-                city:data.geocodes[0].city
+    let key = keyList[page]; //'576f26878e97ff52c64718a56a0ae72a'
+    let url = 'http://restapi.amap.com/v3/geocode/geo?key=' + key + '&address=' + encodeURIComponent(address);
+
+    return await axios
+        .get(url)
+        .then(res => {
+            let data = JSON.parse(res.data);
+            if (data.status == '1' && data.count != '0') {
+                return {province: data.geocodes[0].province, city: data.geocodes[0].city}
+            } else {
+                return {province: '', city: ''}
             }
-        }else{
-            return {
-                province:'',
-                city:''
-            }
+        })
+}
+
+async function getProvinceInfo2(address) {
+    let url = 'http://lbs.amap.com/dev/api?city=&address=' + encodeURIComponent(address);
+
+    return await axios({
+        type: 'post',
+        url,
+        params: querystring.stringify({type: 'geocode/geo', version: 'v3'}),
+        headers:{
+            Accept:'application/json, text/javascript, */*; q=0.01',
+            'Accept-Encoding':'gzip, deflate',
+            'Accept-Language':'zh-CN,zh;q=0.8',
+            Connection:'keep-alive',
+            'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8',
+            Cookie:'AMAPID=423781fbf335bb4f69adc91dfe9d32f0',
+            Host:'lbs.amap.com',
+            Origin:'http://lbs.amap.com',
+            Referer:'http://lbs.amap.com/api/webservice/summary/',
+            'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36',
+            'X-Requested-With':'XMLHttpRequest'
         }
+    }).then(res => {
+        let data = JSON.parse(res.data);
+        if (data.status == '1' && data.count != '0') {
+            return {province: data.geocodes[0].province, city: data.geocodes[0].city}
+        } else {
+            return {province: '', city: ''}
+        }
+    }).catch(e=>{
+        console.log(e);
     })
 }
 
-async function updateLocateInfo(){
-    let sql = 'select * from reg_org';
+async function updateLocateInfo() {
+    updateLocateByPage(0);
+    updateLocateByPage(1);
+    updateLocateByPage(2);
+    updateLocateByPage(3);
+    updateLocateByPage(4);
+    batch();
+}
+
+async function batch(){
+    let sql = `select city,count(*) from (select name,concat(substring_index(name,'市',1),'市') city from reg_org where name like '%市%' )a group by city having count(*)>10 order by 2 desc`;
     let orgs = await query(sql);
-    for(let i=0;i<orgs.length;i++){
-        let address = await getProvinceInfo(orgs[i].name);
+    for (let i = 0; i < orgs.length; i++) {
+        let address = await getProvinceInfo(orgs[i].name,4);
+        let sql = `update company_detail set province='${address.province}',city='${address.city}' where register_org = '${orgs[i].name}'`;
+        await query(sql);
+        console.log(`第${i}/${orgs.length}数据批量更新完毕,${sql}`);
+    }
+}
+
+async function updateLocateByPage(page){
+    let sql = `select * from reg_org where  name not like '%市%' limit ${page*800+1} ,800`;
+    let orgs = await query(sql);
+    for (let i = 0; i < orgs.length; i++) {
+        let address = await getProvinceInfo(orgs[i].name,page);
         let sql = `update company_detail set province='${address.province}',city='${address.city}' where register_org = '${orgs[i].name}'`;
         await query(sql);
         console.log(`第${i}/${orgs.length}数据更新完毕,${sql}`);
     }
 }
-
-
 
 module.exports = {
     init,
