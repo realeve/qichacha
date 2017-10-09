@@ -216,11 +216,11 @@ async function updateLocateInfo() {
 }
 
 async function batch(){
-    let sql = `select city,count(*) from (select name,concat(substring_index(name,'市',1),'市') city from reg_org where name like '%市%' )a group by city having count(*)>10 order by 2 desc`;
+    let sql = `select city name,count(*) from (select name,concat(substring_index(name,'市',1),'市') city from reg_org where name like '%市%' )a group by city having count(*)>10 order by 2 desc`;
     let orgs = await query(sql);
     for (let i = 0; i < orgs.length; i++) {
         let address = await getProvinceInfo(orgs[i].name,4);
-        let sql = `update company_detail set province='${address.province}',city='${address.city}' where register_org = '${orgs[i].name}'`;
+        let sql = `update company_detail set province='${address.province}',city='${address.city}' where register_org like '%${orgs[i].name}%' and province=''`;
         await query(sql);
         console.log(`第${i}/${orgs.length}数据批量更新完毕,${sql}`);
     }
